@@ -47,6 +47,15 @@ export interface Expense {
   created_at: string;
 }
 
+export interface RestDay {
+  rest_id: string;
+  user_id: string;
+  date: string;
+  job_id?: string;
+  notes?: string;
+  created_at: string;
+}
+
 export interface DashboardSummary {
   month: string;
   total_regular_earnings: number;

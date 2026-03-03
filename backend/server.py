@@ -118,9 +118,30 @@ class WorkEntryCreate(BaseModel):
     is_next_day: bool = False
     notes: Optional[str] = None
 
+class WorkEntryUpdate(BaseModel):
+    job_id: Optional[str] = None
+    date: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    is_next_day: Optional[bool] = None
+    notes: Optional[str] = None
+
 class WorkEntryClose(BaseModel):
     end_time: str
     is_next_day: bool = False
+
+class RestDay(BaseModel):
+    rest_id: str = Field(default_factory=lambda: f"rest_{uuid.uuid4().hex[:12]}")
+    user_id: str
+    date: str  # YYYY-MM-DD format
+    job_id: Optional[str] = None  # Optional: specific job, or None for all jobs
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RestDayCreate(BaseModel):
+    date: str
+    job_id: Optional[str] = None
+    notes: Optional[str] = None
 
 class Expense(BaseModel):
     expense_id: str = Field(default_factory=lambda: f"expense_{uuid.uuid4().hex[:12]}")
@@ -675,6 +696,57 @@ async def close_work_entry(
     updated_entry = await db.work_entries.find_one({"entry_id": entry_id}, {"_id": 0})
     return updated_entry
 
+@api_router.put("/work-entries/{entry_id}", response_model=dict)
+async def update_work_entry(
+    entry_id: str,
+    entry_data: WorkEntryUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a work entry (edit past entries)"""
+    entry = await db.work_entries.find_one(
+        {"entry_id": entry_id, "user_id": current_user["user_id"]},
+        {"_id": 0}
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Work entry not found")
+    
+    # Build update data
+    update_data = {k: v for k, v in entry_data.model_dump().items() if v is not None}
+    
+    # If job_id is being updated, verify it belongs to user
+    job_id = update_data.get("job_id", entry["job_id"])
+    job = await db.jobs.find_one(
+        {"job_id": job_id, "user_id": current_user["user_id"]},
+        {"_id": 0}
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Recalculate earnings if times are updated
+    start_time = update_data.get("start_time", entry["start_time"])
+    end_time = update_data.get("end_time", entry.get("end_time"))
+    is_next_day = update_data.get("is_next_day", entry.get("is_next_day", False))
+    
+    if end_time:
+        calc = calculate_work_hours_and_earnings(job, start_time, end_time, is_next_day)
+        update_data.update({
+            "regular_hours": calc["regular_hours"],
+            "extra_hours": calc["extra_hours"],
+            "regular_earnings": calc["regular_earnings"],
+            "extra_earnings": calc["extra_earnings"],
+            "total_earnings": calc["total_earnings"],
+        })
+    
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    
+    await db.work_entries.update_one(
+        {"entry_id": entry_id},
+        {"$set": update_data}
+    )
+    
+    updated_entry = await db.work_entries.find_one({"entry_id": entry_id}, {"_id": 0})
+    return updated_entry
+
 @api_router.delete("/work-entries/{entry_id}")
 async def delete_work_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a work entry"""
@@ -684,6 +756,60 @@ async def delete_work_entry(entry_id: str, current_user: dict = Depends(get_curr
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Work entry not found")
     return {"message": "Work entry deleted"}
+
+# ===== REST DAY ENDPOINTS =====
+
+@api_router.get("/rest-days", response_model=List[dict])
+async def get_rest_days(
+    current_user: dict = Depends(get_current_user),
+    month: Optional[str] = None  # YYYY-MM format
+):
+    """Get rest days for the current user"""
+    query = {"user_id": current_user["user_id"]}
+    
+    if month:
+        query["date"] = {"$regex": f"^{month}"}
+    
+    rest_days = await db.rest_days.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    return rest_days
+
+@api_router.post("/rest-days", response_model=dict)
+async def create_rest_day(rest_data: RestDayCreate, current_user: dict = Depends(get_current_user)):
+    """Mark a day as rest day"""
+    # Check if rest day already exists for this date
+    existing = await db.rest_days.find_one({
+        "user_id": current_user["user_id"],
+        "date": rest_data.date,
+        "job_id": rest_data.job_id
+    }, {"_id": 0})
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Rest day already exists for this date")
+    
+    rest_day = RestDay(
+        user_id=current_user["user_id"],
+        **rest_data.model_dump()
+    )
+    await db.rest_days.insert_one(rest_day.model_dump())
+    return rest_day.model_dump()
+
+@api_router.delete("/rest-days/{rest_id}")
+async def delete_rest_day(rest_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove rest day mark"""
+    result = await db.rest_days.delete_one(
+        {"rest_id": rest_id, "user_id": current_user["user_id"]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Rest day not found")
+    return {"message": "Rest day deleted"}
+
+@api_router.delete("/rest-days/date/{date}")
+async def delete_rest_day_by_date(date: str, current_user: dict = Depends(get_current_user)):
+    """Remove rest day mark by date"""
+    result = await db.rest_days.delete_many(
+        {"date": date, "user_id": current_user["user_id"]}
+    )
+    return {"message": f"Deleted {result.deleted_count} rest day(s)"}
 
 # ===== EXPENSE ENDPOINTS =====
 

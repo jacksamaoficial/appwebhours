@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Job, WorkEntry, Expense, DashboardSummary, WeeklyData, HistoryItem } from '../types';
-import { jobsApi, workEntriesApi, expensesApi, dashboardApi } from '../services/api';
+import { Job, WorkEntry, Expense, DashboardSummary, WeeklyData, HistoryItem, RestDay } from '../types';
+import { jobsApi, workEntriesApi, expensesApi, dashboardApi, restDaysApi } from '../services/api';
 import { format } from 'date-fns';
 
 interface DataState {
@@ -8,6 +8,7 @@ interface DataState {
   jobs: Job[];
   workEntries: WorkEntry[];
   expenses: Expense[];
+  restDays: RestDay[];
   summary: DashboardSummary | null;
   weeklyData: WeeklyData[];
   history: HistoryItem[];
@@ -30,12 +31,18 @@ interface DataState {
   
   fetchWorkEntries: () => Promise<void>;
   createWorkEntry: (entry: any) => Promise<WorkEntry>;
+  updateWorkEntry: (entryId: string, entry: any) => Promise<void>;
   closeWorkEntry: (entryId: string, endTime: string, isNextDay: boolean) => Promise<void>;
   deleteWorkEntry: (entryId: string) => Promise<void>;
   
   fetchExpenses: () => Promise<void>;
   createExpense: (expense: any) => Promise<void>;
   deleteExpense: (expenseId: string) => Promise<void>;
+  
+  fetchRestDays: () => Promise<void>;
+  createRestDay: (restDay: any) => Promise<void>;
+  deleteRestDay: (restId: string) => Promise<void>;
+  toggleRestDay: (date: string, jobId?: string) => Promise<void>;
   
   fetchDashboard: () => Promise<void>;
   fetchWeeklyChart: () => Promise<void>;
@@ -48,6 +55,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   jobs: [],
   workEntries: [],
   expenses: [],
+  restDays: [],
   summary: null,
   weeklyData: [],
   history: [],
@@ -124,6 +132,17 @@ export const useDataStore = create<DataState>((set, get) => ({
     get().fetchHistory();
   },
   
+  updateWorkEntry: async (entryId: string, entry: any) => {
+    const updatedEntry = await workEntriesApi.update(entryId, entry);
+    set((state) => ({
+      workEntries: state.workEntries.map((e) =>
+        e.entry_id === entryId ? updatedEntry : e
+      ),
+    }));
+    get().fetchDashboard();
+    get().fetchHistory();
+  },
+  
   deleteWorkEntry: async (entryId: string) => {
     await workEntriesApi.delete(entryId);
     set((state) => ({
@@ -157,6 +176,39 @@ export const useDataStore = create<DataState>((set, get) => ({
       expenses: state.expenses.filter((e) => e.expense_id !== expenseId),
     }));
     get().fetchDashboard();
+  },
+  
+  fetchRestDays: async () => {
+    try {
+      const { currentMonth } = get();
+      const restDays = await restDaysApi.getAll(currentMonth);
+      set({ restDays });
+    } catch (error) {
+      console.error('Error fetching rest days:', error);
+    }
+  },
+  
+  createRestDay: async (restDay: any) => {
+    const newRestDay = await restDaysApi.create(restDay);
+    set((state) => ({ restDays: [newRestDay, ...state.restDays] }));
+  },
+  
+  deleteRestDay: async (restId: string) => {
+    await restDaysApi.delete(restId);
+    set((state) => ({
+      restDays: state.restDays.filter((r) => r.rest_id !== restId),
+    }));
+  },
+  
+  toggleRestDay: async (date: string, jobId?: string) => {
+    const { restDays } = get();
+    const existing = restDays.find((r) => r.date === date && r.job_id === jobId);
+    
+    if (existing) {
+      await get().deleteRestDay(existing.rest_id);
+    } else {
+      await get().createRestDay({ date, job_id: jobId });
+    }
   },
   
   fetchDashboard: async () => {
@@ -195,6 +247,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       state.fetchJobs(),
       state.fetchWorkEntries(),
       state.fetchExpenses(),
+      state.fetchRestDays(),
       state.fetchDashboard(),
       state.fetchWeeklyChart(),
       state.fetchHistory(),

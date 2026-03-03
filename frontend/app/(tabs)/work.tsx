@@ -16,76 +16,117 @@ import { colors, spacing } from '../../src/utils/colors';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { useDataStore } from '../../src/store/dataStore';
-import { format } from 'date-fns';
+import { format, subDays, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Job, WorkEntry } from '../../src/types';
+import { Job, WorkEntry, RestDay } from '../../src/types';
 
 export default function WorkScreen() {
   const {
     jobs,
     workEntries,
+    restDays,
     isLoadingJobs,
     isLoadingEntries,
     fetchJobs,
     fetchWorkEntries,
+    fetchRestDays,
     createWorkEntry,
+    updateWorkEntry,
     closeWorkEntry,
     deleteWorkEntry,
+    toggleRestDay,
   } = useDataStore();
 
+  // Modal states
   const [modalVisible, setModalVisible] = useState(false);
   const [closeModalVisible, setCloseModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+  
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<WorkEntry | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
-  // Form state
+  // Form state for new/edit entry
+  const [entryDate, setEntryDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [startTime, setStartTime] = useState('16:00');
   const [endTime, setEndTime] = useState('20:00');
   const [isNextDay, setIsNextDay] = useState(false);
   const [notes, setNotes] = useState('');
+  const [isCompleteEntry, setIsCompleteEntry] = useState(false); // If adding complete day at once
 
   useEffect(() => {
     fetchJobs();
     fetchWorkEntries();
+    fetchRestDays();
   }, []);
 
   const handleRefresh = () => {
     fetchJobs();
     fetchWorkEntries();
+    fetchRestDays();
   };
 
+  // Start new entry (clock in)
   const handleStartEntry = (job: Job) => {
     setSelectedJob(job);
+    setEntryDate(format(new Date(), 'yyyy-MM-dd'));
     setStartTime(job.standard_start);
+    setEndTime(job.standard_end);
     setNotes('');
+    setIsNextDay(false);
+    setIsCompleteEntry(false);
     setModalVisible(true);
   };
 
+  // Add manual entry for past day
+  const handleAddManualEntry = (job: Job, date?: string) => {
+    setSelectedJob(job);
+    setEntryDate(date || format(subDays(new Date(), 1), 'yyyy-MM-dd'));
+    setStartTime(job.standard_start);
+    setEndTime(job.standard_end);
+    setNotes('');
+    setIsNextDay(false);
+    setIsCompleteEntry(true);
+    setModalVisible(true);
+  };
+
+  // Create new entry
   const handleCreateEntry = async () => {
     if (!selectedJob) return;
     
     try {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      await createWorkEntry({
+      const entryData: any = {
         job_id: selectedJob.job_id,
-        date: today,
+        date: entryDate,
         start_time: startTime,
         notes: notes || undefined,
-      });
+      };
+
+      // If adding complete entry with end time
+      if (isCompleteEntry && endTime) {
+        entryData.end_time = endTime;
+        entryData.is_next_day = isNextDay;
+      }
+
+      await createWorkEntry(entryData);
       setModalVisible(false);
-      Alert.alert('Éxito', 'Jornada iniciada correctamente');
+      Alert.alert('Éxito', isCompleteEntry ? 'Jornada añadida correctamente' : 'Jornada iniciada correctamente');
     } catch (error) {
-      Alert.alert('Error', 'No se pudo iniciar la jornada');
+      Alert.alert('Error', 'No se pudo crear la jornada');
     }
   };
 
+  // Open close modal
   const handleOpenCloseModal = (entry: WorkEntry) => {
     setSelectedEntry(entry);
-    setEndTime('20:00');
+    const job = jobs.find(j => j.job_id === entry.job_id);
+    setEndTime(job?.standard_end || '20:00');
     setIsNextDay(false);
     setCloseModalVisible(true);
   };
 
+  // Close entry
   const handleCloseEntry = async () => {
     if (!selectedEntry) return;
     
@@ -98,6 +139,37 @@ export default function WorkScreen() {
     }
   };
 
+  // Open edit modal
+  const handleOpenEditModal = (entry: WorkEntry) => {
+    setSelectedEntry(entry);
+    setEntryDate(entry.date);
+    setStartTime(entry.start_time);
+    setEndTime(entry.end_time || '20:00');
+    setIsNextDay(entry.is_next_day);
+    setNotes(entry.notes || '');
+    setEditModalVisible(true);
+  };
+
+  // Update entry
+  const handleUpdateEntry = async () => {
+    if (!selectedEntry) return;
+    
+    try {
+      await updateWorkEntry(selectedEntry.entry_id, {
+        date: entryDate,
+        start_time: startTime,
+        end_time: endTime,
+        is_next_day: isNextDay,
+        notes: notes || undefined,
+      });
+      setEditModalVisible(false);
+      Alert.alert('Éxito', 'Jornada actualizada correctamente');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo actualizar la jornada');
+    }
+  };
+
+  // Delete entry
   const handleDeleteEntry = (entryId: string) => {
     Alert.alert(
       'Eliminar Registro',
@@ -119,8 +191,33 @@ export default function WorkScreen() {
     );
   };
 
+  // Toggle rest day
+  const handleToggleRestDay = async (date: string) => {
+    try {
+      await toggleRestDay(date);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo marcar el día de descanso');
+    }
+  };
+
+  // Check if date is rest day
+  const isRestDay = (date: string) => {
+    return restDays.some(r => r.date === date);
+  };
+
+  // Get entries for a specific date
+  const getEntriesForDate = (date: string) => {
+    return workEntries.filter(e => e.date === date);
+  };
+
   // Get open entries (without end_time)
   const openEntries = workEntries.filter((e) => !e.end_time);
+
+  // Generate calendar days for current month
+  const calendarDays = eachDayOfInterval({
+    start: startOfMonth(selectedDate),
+    end: endOfMonth(selectedDate),
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -138,8 +235,16 @@ export default function WorkScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Control Horario</Text>
-          <Text style={styles.subtitle}>{format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}</Text>
+          <View>
+            <Text style={styles.title}>Control Horario</Text>
+            <Text style={styles.subtitle}>{format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.calendarButton}
+            onPress={() => setCalendarModalVisible(true)}
+          >
+            <Ionicons name="calendar" size={22} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Open Entries Alert */}
@@ -156,11 +261,18 @@ export default function WorkScreen() {
         )}
 
         {/* Jobs */}
-        <Text style={styles.sectionTitle}>Tus Trabajos</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Tus Trabajos</Text>
+          <TouchableOpacity onPress={() => Alert.alert('Tip', 'Añade más trabajos desde Ajustes')}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+        
         {jobs.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="briefcase-outline" size={48} color={colors.textMuted} />
             <Text style={styles.emptyText}>No tienes trabajos configurados</Text>
+            <Text style={styles.emptySubtext}>Ve a Ajustes para añadir un trabajo</Text>
           </View>
         ) : (
           jobs.filter((j) => j.is_active).map((job) => (
@@ -180,16 +292,42 @@ export default function WorkScreen() {
                 <Text style={styles.jobSchedule}>
                   Horario: {job.standard_start} - {job.standard_end}
                 </Text>
-                <Button
-                  title="Fichar"
-                  onPress={() => handleStartEntry(job)}
-                  size="small"
-                  icon={<Ionicons name="play" size={16} color={colors.white} />}
-                />
+                <View style={styles.jobButtons}>
+                  <TouchableOpacity
+                    style={styles.addPastButton}
+                    onPress={() => handleAddManualEntry(job)}
+                  >
+                    <Ionicons name="add-circle-outline" size={20} color={colors.textSecondary} />
+                    <Text style={styles.addPastText}>Añadir día</Text>
+                  </TouchableOpacity>
+                  <Button
+                    title="Fichar"
+                    onPress={() => handleStartEntry(job)}
+                    size="small"
+                    icon={<Ionicons name="play" size={16} color={colors.white} />}
+                  />
+                </View>
               </View>
             </View>
           ))
         )}
+
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={styles.quickAction}
+            onPress={() => handleToggleRestDay(format(new Date(), 'yyyy-MM-dd'))}
+          >
+            <Ionicons
+              name={isRestDay(format(new Date(), 'yyyy-MM-dd')) ? 'bed' : 'bed-outline'}
+              size={24}
+              color={isRestDay(format(new Date(), 'yyyy-MM-dd')) ? colors.primary : colors.textMuted}
+            />
+            <Text style={styles.quickActionText}>
+              {isRestDay(format(new Date(), 'yyyy-MM-dd')) ? 'Día de descanso' : 'Marcar descanso'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Recent Entries */}
         <Text style={styles.sectionTitle}>Registros del Mes</Text>
@@ -199,12 +337,14 @@ export default function WorkScreen() {
             <Text style={styles.emptyText}>No hay registros este mes</Text>
           </View>
         ) : (
-          workEntries.slice(0, 10).map((entry) => {
+          workEntries.slice(0, 15).map((entry) => {
             const job = jobs.find((j) => j.job_id === entry.job_id);
+            const entryRestDay = isRestDay(entry.date);
             return (
               <TouchableOpacity
                 key={entry.entry_id}
-                style={styles.entryCard}
+                style={[styles.entryCard, entryRestDay && styles.entryCardRest]}
+                onPress={() => handleOpenEditModal(entry)}
                 onLongPress={() => handleDeleteEntry(entry.entry_id)}
               >
                 <View style={styles.entryLeft}>
@@ -216,11 +356,13 @@ export default function WorkScreen() {
                   />
                   <View>
                     <Text style={styles.entryDate}>
-                      {format(new Date(entry.date), "d 'de' MMM", { locale: es })}
+                      {format(parseISO(entry.date), "EEE, d 'de' MMM", { locale: es })}
                     </Text>
                     <Text style={styles.entryTime}>
                       {entry.start_time} {entry.end_time ? `- ${entry.end_time}` : '(en curso)'}
+                      {entry.is_next_day && ' (+1)'}
                     </Text>
+                    {job && <Text style={styles.entryJob}>{job.name}</Text>}
                   </View>
                 </View>
                 <View style={styles.entryRight}>
@@ -248,14 +390,38 @@ export default function WorkScreen() {
             );
           })
         )}
+
+        {/* Rest Days Section */}
+        {restDays.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Días de Descanso</Text>
+            <View style={styles.restDaysList}>
+              {restDays.slice(0, 5).map((restDay) => (
+                <TouchableOpacity
+                  key={restDay.rest_id}
+                  style={styles.restDayChip}
+                  onPress={() => handleToggleRestDay(restDay.date)}
+                >
+                  <Ionicons name="bed" size={16} color={colors.primary} />
+                  <Text style={styles.restDayText}>
+                    {format(parseISO(restDay.date), "d MMM", { locale: es })}
+                  </Text>
+                  <Ionicons name="close" size={14} color={colors.textMuted} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* Start Entry Modal */}
+      {/* New/Manual Entry Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Iniciar Jornada</Text>
+              <Text style={styles.modalTitle}>
+                {isCompleteEntry ? 'Añadir Jornada' : 'Iniciar Jornada'}
+              </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -265,6 +431,27 @@ export default function WorkScreen() {
               <Text style={styles.modalSubtitle}>{selectedJob.name}</Text>
             )}
 
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.switchLabel}>Jornada completa</Text>
+                <Text style={styles.switchSubtitle}>Añadir hora de inicio y fin</Text>
+              </View>
+              <Switch
+                value={isCompleteEntry}
+                onValueChange={setIsCompleteEntry}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={isCompleteEntry ? colors.primary : colors.textMuted}
+              />
+            </View>
+
+            <Input
+              label="Fecha"
+              value={entryDate}
+              onChangeText={setEntryDate}
+              placeholder="2026-03-03"
+              icon="calendar"
+            />
+
             <Input
               label="Hora de Inicio"
               value={startTime}
@@ -273,17 +460,42 @@ export default function WorkScreen() {
               icon="time"
             />
 
+            {isCompleteEntry && (
+              <>
+                <Input
+                  label="Hora de Fin"
+                  value={endTime}
+                  onChangeText={setEndTime}
+                  placeholder="20:00"
+                  icon="time"
+                />
+
+                <View style={styles.switchRow}>
+                  <View>
+                    <Text style={styles.switchLabel}>¿Terminaste después de medianoche?</Text>
+                    <Text style={styles.switchSubtitle}>Activa si tu hora de fin es de madrugada</Text>
+                  </View>
+                  <Switch
+                    value={isNextDay}
+                    onValueChange={setIsNextDay}
+                    trackColor={{ false: colors.border, true: colors.primaryLight }}
+                    thumbColor={isNextDay ? colors.primary : colors.textMuted}
+                  />
+                </View>
+              </>
+            )}
+
             <Input
               label="Notas (opcional)"
               value={notes}
               onChangeText={setNotes}
               placeholder="Añade notas sobre tu jornada"
               multiline
-              numberOfLines={3}
+              numberOfLines={2}
             />
 
             <Button
-              title="Iniciar Jornada"
+              title={isCompleteEntry ? 'Añadir Jornada' : 'Iniciar Jornada'}
               onPress={handleCreateEntry}
               size="large"
               style={styles.modalButton}
@@ -337,6 +549,159 @@ export default function WorkScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Entry Modal */}
+      <Modal visible={editModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Editar Jornada</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Input
+              label="Fecha"
+              value={entryDate}
+              onChangeText={setEntryDate}
+              placeholder="2026-03-03"
+              icon="calendar"
+            />
+
+            <Input
+              label="Hora de Inicio"
+              value={startTime}
+              onChangeText={setStartTime}
+              placeholder="16:00"
+              icon="time"
+            />
+
+            <Input
+              label="Hora de Fin"
+              value={endTime}
+              onChangeText={setEndTime}
+              placeholder="20:00"
+              icon="time"
+            />
+
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.switchLabel}>¿Terminaste después de medianoche?</Text>
+                <Text style={styles.switchSubtitle}>Activa si tu hora de fin es de madrugada</Text>
+              </View>
+              <Switch
+                value={isNextDay}
+                onValueChange={setIsNextDay}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={isNextDay ? colors.primary : colors.textMuted}
+              />
+            </View>
+
+            <Input
+              label="Notas (opcional)"
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Añade notas"
+              multiline
+              numberOfLines={2}
+            />
+
+            <Button
+              title="Guardar Cambios"
+              onPress={handleUpdateEntry}
+              size="large"
+              style={styles.modalButton}
+            />
+
+            <Button
+              title="Eliminar Jornada"
+              onPress={() => {
+                if (selectedEntry) {
+                  handleDeleteEntry(selectedEntry.entry_id);
+                  setEditModalVisible(false);
+                }
+              }}
+              variant="danger"
+              size="medium"
+              style={styles.deleteButton}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Calendar Modal */}
+      <Modal visible={calendarModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Calendario</Text>
+              <TouchableOpacity onPress={() => setCalendarModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={() => setSelectedDate(subDays(startOfMonth(selectedDate), 1))}>
+                <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={styles.calendarMonth}>
+                {format(selectedDate, 'MMMM yyyy', { locale: es })}
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedDate(addDays(endOfMonth(selectedDate), 1))}>
+                <Ionicons name="chevron-forward" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.calendarWeekDays}>
+              {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day, i) => (
+                <Text key={i} style={styles.calendarWeekDay}>{day}</Text>
+              ))}
+            </View>
+
+            <View style={styles.calendarGrid}>
+              {calendarDays.map((day) => {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const hasEntries = getEntriesForDate(dateStr).length > 0;
+                const isRest = isRestDay(dateStr);
+                const isToday = isSameDay(day, new Date());
+                
+                return (
+                  <TouchableOpacity
+                    key={dateStr}
+                    style={[
+                      styles.calendarDay,
+                      isToday && styles.calendarDayToday,
+                      hasEntries && styles.calendarDayHasEntry,
+                      isRest && styles.calendarDayRest,
+                    ]}
+                    onPress={() => handleToggleRestDay(dateStr)}
+                    onLongPress={() => {
+                      if (jobs.length > 0) {
+                        handleAddManualEntry(jobs[0], dateStr);
+                        setCalendarModalVisible(false);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.calendarDayText,
+                      isToday && styles.calendarDayTextToday,
+                    ]}>
+                      {format(day, 'd')}
+                    </Text>
+                    {hasEntries && <View style={styles.calendarDot} />}
+                    {isRest && <Ionicons name="bed" size={10} color={colors.primary} style={styles.calendarRestIcon} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.calendarHelp}>
+              Toca para marcar descanso • Mantén pulsado para añadir jornada
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -354,6 +719,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.lg,
   },
   title: {
@@ -366,6 +734,14 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textTransform: 'capitalize',
     marginTop: spacing.xs,
+  },
+  calendarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   alertCard: {
     flexDirection: 'row',
@@ -390,6 +766,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   sectionTitle: {
     fontSize: 18,
@@ -440,6 +822,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textMuted,
   },
+  jobButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  addPastButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  addPastText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    marginVertical: spacing.md,
+  },
+  quickAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 10,
+    gap: spacing.sm,
+  },
+  quickActionText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
   entryCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -449,9 +864,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+  entryCardRest: {
+    opacity: 0.6,
+  },
   entryLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   entryStatus: {
     width: 8,
@@ -463,10 +882,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
+    textTransform: 'capitalize',
   },
   entryTime: {
     fontSize: 13,
     color: colors.textSecondary,
+    marginTop: 2,
+  },
+  entryJob: {
+    fontSize: 12,
+    color: colors.textMuted,
     marginTop: 2,
   },
   entryRight: {
@@ -482,6 +907,24 @@ const styles = StyleSheet.create({
     color: colors.warning,
     marginTop: 2,
   },
+  restDaysList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  restDayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 20,
+    gap: spacing.xs,
+  },
+  restDayText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: spacing.xl,
@@ -490,6 +933,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
     marginTop: spacing.md,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
   },
   modalOverlay: {
     flex: 1,
@@ -502,6 +950,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -522,6 +971,9 @@ const styles = StyleSheet.create({
   modalButton: {
     marginTop: spacing.md,
   },
+  deleteButton: {
+    marginTop: spacing.sm,
+  },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -540,5 +992,78 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  calendarMonth: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    textTransform: 'capitalize',
+  },
+  calendarWeekDays: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+  },
+  calendarWeekDay: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarDay: {
+    width: '14.28%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  calendarDayToday: {
+    backgroundColor: colors.primary + '30',
+    borderRadius: 8,
+  },
+  calendarDayHasEntry: {
+    backgroundColor: colors.success + '20',
+    borderRadius: 8,
+  },
+  calendarDayRest: {
+    backgroundColor: colors.primary + '10',
+    borderRadius: 8,
+  },
+  calendarDayText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  calendarDayTextToday: {
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  calendarDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.success,
+  },
+  calendarRestIcon: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+  },
+  calendarHelp: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
 });

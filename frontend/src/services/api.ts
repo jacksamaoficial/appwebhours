@@ -125,6 +125,10 @@ export const workEntriesApi = {
     const response = await api.post('/work-entries', entry);
     return response.data;
   },
+  update: async (entryId: string, entry: any) => {
+    const response = await api.put(`/work-entries/${entryId}`, entry);
+    return response.data;
+  },
   close: async (entryId: string, endTime: string, isNextDay: boolean) => {
     const response = await api.put(`/work-entries/${entryId}/close`, {
       end_time: endTime,
@@ -134,6 +138,28 @@ export const workEntriesApi = {
   },
   delete: async (entryId: string) => {
     const response = await api.delete(`/work-entries/${entryId}`);
+    return response.data;
+  },
+};
+
+// Rest Days APIs
+export const restDaysApi = {
+  getAll: async (month?: string) => {
+    const params: any = {};
+    if (month) params.month = month;
+    const response = await api.get('/rest-days', { params });
+    return response.data;
+  },
+  create: async (restDay: any) => {
+    const response = await api.post('/rest-days', restDay);
+    return response.data;
+  },
+  delete: async (restId: string) => {
+    const response = await api.delete(`/rest-days/${restId}`);
+    return response.data;
+  },
+  deleteByDate: async (date: string) => {
+    const response = await api.delete(`/rest-days/date/${date}`);
     return response.data;
   },
 };
