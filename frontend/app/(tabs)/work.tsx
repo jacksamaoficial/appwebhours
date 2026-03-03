@@ -35,6 +35,8 @@ export default function WorkScreen() {
     closeWorkEntry,
     deleteWorkEntry,
     toggleRestDay,
+    createJob,
+    deleteRestDay,
   } = useDataStore();
 
   // Modal states
@@ -42,6 +44,7 @@ export default function WorkScreen() {
   const [closeModalVisible, setCloseModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+  const [jobModalVisible, setJobModalVisible] = useState(false);
   
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<WorkEntry | null>(null);
@@ -54,6 +57,14 @@ export default function WorkScreen() {
   const [isNextDay, setIsNextDay] = useState(false);
   const [notes, setNotes] = useState('');
   const [isCompleteEntry, setIsCompleteEntry] = useState(false); // If adding complete day at once
+
+  // Form state for new job
+  const [jobName, setJobName] = useState('');
+  const [baseSalary, setBaseSalary] = useState('');
+  const [hoursPerWeek, setHoursPerWeek] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [standardStart, setStandardStart] = useState('16:00');
+  const [standardEnd, setStandardEnd] = useState('20:00');
 
   useEffect(() => {
     fetchJobs();
@@ -196,7 +207,50 @@ export default function WorkScreen() {
     try {
       await toggleRestDay(date);
     } catch (error) {
-      Alert.alert('Error', 'No se pudo marcar el día de descanso');
+      Alert.alert('Error', 'No se pudo actualizar el día de descanso');
+    }
+  };
+
+  // Delete rest day
+  const handleDeleteRestDay = async (restId: string) => {
+    try {
+      await deleteRestDay(restId);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo eliminar el día de descanso');
+    }
+  };
+
+  // Open add job modal
+  const handleOpenAddJobModal = () => {
+    setJobName('');
+    setBaseSalary('');
+    setHoursPerWeek('');
+    setHourlyRate('');
+    setStandardStart('16:00');
+    setStandardEnd('20:00');
+    setJobModalVisible(true);
+  };
+
+  // Create new job
+  const handleCreateJob = async () => {
+    if (!jobName || !baseSalary || !hoursPerWeek || !hourlyRate) {
+      Alert.alert('Error', 'Por favor completa todos los campos');
+      return;
+    }
+
+    try {
+      await createJob({
+        name: jobName,
+        base_salary: parseFloat(baseSalary),
+        hours_per_week: parseInt(hoursPerWeek),
+        hourly_rate: parseFloat(hourlyRate),
+        standard_start: standardStart,
+        standard_end: standardEnd,
+      });
+      setJobModalVisible(false);
+      Alert.alert('Éxito', 'Trabajo añadido correctamente');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo crear el trabajo');
     }
   };
 
@@ -263,8 +317,8 @@ export default function WorkScreen() {
         {/* Jobs */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Tus Trabajos</Text>
-          <TouchableOpacity onPress={() => Alert.alert('Tip', 'Añade más trabajos desde Ajustes')}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.textMuted} />
+          <TouchableOpacity style={styles.addJobHeaderButton} onPress={handleOpenAddJobModal}>
+            <Ionicons name="add-circle" size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
         
@@ -396,20 +450,21 @@ export default function WorkScreen() {
           <>
             <Text style={styles.sectionTitle}>Días de Descanso</Text>
             <View style={styles.restDaysList}>
-              {restDays.slice(0, 5).map((restDay) => (
+              {restDays.slice(0, 10).map((restDay) => (
                 <TouchableOpacity
                   key={restDay.rest_id}
                   style={styles.restDayChip}
-                  onPress={() => handleToggleRestDay(restDay.date)}
+                  onPress={() => handleDeleteRestDay(restDay.rest_id)}
                 >
                   <Ionicons name="bed" size={16} color={colors.primary} />
                   <Text style={styles.restDayText}>
                     {format(parseISO(restDay.date), "d MMM", { locale: es })}
                   </Text>
-                  <Ionicons name="close" size={14} color={colors.textMuted} />
+                  <Ionicons name="close-circle" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.restDaysHelp}>Toca para eliminar un día de descanso</Text>
           </>
         )}
       </ScrollView>
@@ -699,6 +754,89 @@ export default function WorkScreen() {
             <Text style={styles.calendarHelp}>
               Toca para marcar descanso • Mantén pulsado para añadir jornada
             </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Job Modal */}
+      <Modal visible={jobModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Nuevo Trabajo</Text>
+              <TouchableOpacity onPress={() => setJobModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Input
+                label="Nombre del trabajo"
+                value={jobName}
+                onChangeText={setJobName}
+                placeholder="Ej: Trabajo Principal"
+                icon="briefcase"
+              />
+
+              <Input
+                label="Salario base mensual (€)"
+                value={baseSalary}
+                onChangeText={setBaseSalary}
+                placeholder="638.00"
+                keyboardType="decimal-pad"
+                icon="cash"
+              />
+
+              <Input
+                label="Horas semanales"
+                value={hoursPerWeek}
+                onChangeText={setHoursPerWeek}
+                placeholder="20"
+                keyboardType="numeric"
+                icon="time"
+              />
+
+              <Input
+                label="Tarifa hora extra (€)"
+                value={hourlyRate}
+                onChangeText={setHourlyRate}
+                placeholder="7.50"
+                keyboardType="decimal-pad"
+                icon="trending-up"
+              />
+
+              <View style={styles.timeRow}>
+                <View style={styles.timeInput}>
+                  <Input
+                    label="Hora inicio"
+                    value={standardStart}
+                    onChangeText={setStandardStart}
+                    placeholder="16:00"
+                    icon="play"
+                  />
+                </View>
+                <View style={styles.timeInput}>
+                  <Input
+                    label="Hora fin estándar"
+                    value={standardEnd}
+                    onChangeText={setStandardEnd}
+                    placeholder="20:00"
+                    icon="stop"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.helpText}>
+                Las horas después de la hora de fin estándar se contarán como extras.
+              </Text>
+
+              <Button
+                title="Crear Trabajo"
+                onPress={handleCreateJob}
+                size="large"
+                style={styles.modalButton}
+              />
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1065,5 +1203,25 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  addJobHeaderButton: {
+    padding: spacing.xs,
+  },
+  restDaysHelp: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  timeInput: {
+    flex: 1,
+  },
+  helpText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
   },
 });
