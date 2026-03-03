@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Switch,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,13 +18,21 @@ import { Input } from '../../src/components/Input';
 import { useAuthStore } from '../../src/store/authStore';
 import { useDataStore } from '../../src/store/dataStore';
 import { Job } from '../../src/types';
+import { notificationService } from '../../src/services/notifications';
 
 export default function SettingsScreen() {
   const { user, logout } = useAuthStore();
   const { jobs, fetchJobs, createJob, updateJob, deleteJob } = useDataStore();
 
   const [jobModalVisible, setJobModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
+  
+  // Notification state
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
+  const [reminderHour, setReminderHour] = useState('20');
+  const [reminderMinute, setReminderMinute] = useState('00');
   
   // Job form state
   const [jobName, setJobName] = useState('');
@@ -34,7 +44,92 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     fetchJobs();
+    checkNotificationStatus();
   }, []);
+
+  const checkNotificationStatus = async () => {
+    if (Platform.OS !== 'web') {
+      const enabled = await notificationService.areNotificationsEnabled();
+      setNotificationsEnabled(enabled);
+      
+      // Check if there's a scheduled daily reminder
+      const scheduled = await notificationService.getScheduledNotifications();
+      const hasReminder = scheduled.some(n => n.content.data?.type === 'daily_reminder');
+      setDailyReminderEnabled(hasReminder);
+    }
+  };
+
+  const handleToggleNotifications = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Info', 'Las notificaciones push solo están disponibles en la app móvil');
+      return;
+    }
+
+    if (!notificationsEnabled) {
+      const granted = await notificationService.requestPermissionWithExplanation();
+      if (granted) {
+        await notificationService.registerTokenWithBackend();
+        setNotificationsEnabled(true);
+        Alert.alert('¡Listo!', 'Notificaciones activadas correctamente');
+      }
+    } else {
+      notificationService.openNotificationSettings();
+    }
+  };
+
+  const handleToggleDailyReminder = async (value: boolean) => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Info', 'Las notificaciones push solo están disponibles en la app móvil');
+      return;
+    }
+
+    if (value) {
+      if (!notificationsEnabled) {
+        const granted = await notificationService.requestPermissionWithExplanation();
+        if (!granted) return;
+        setNotificationsEnabled(true);
+      }
+      
+      const hour = parseInt(reminderHour) || 20;
+      const minute = parseInt(reminderMinute) || 0;
+      await notificationService.scheduleDailyReminder(hour, minute);
+      setDailyReminderEnabled(true);
+      Alert.alert('¡Listo!', `Recordatorio configurado para las ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+    } else {
+      await notificationService.cancelDailyReminders();
+      setDailyReminderEnabled(false);
+      Alert.alert('Desactivado', 'Recordatorio diario desactivado');
+    }
+  };
+
+  const handleSaveReminderTime = async () => {
+    const hour = parseInt(reminderHour);
+    const minute = parseInt(reminderMinute);
+    
+    if (isNaN(hour) || hour < 0 || hour > 23 || isNaN(minute) || minute < 0 || minute > 59) {
+      Alert.alert('Error', 'Por favor introduce una hora válida');
+      return;
+    }
+
+    if (dailyReminderEnabled) {
+      await notificationService.scheduleDailyReminder(hour, minute);
+      Alert.alert('¡Listo!', `Hora actualizada a las ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+    }
+    setNotificationModalVisible(false);
+  };
+
+  const handleTestNotification = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Info', 'Las notificaciones push solo están disponibles en la app móvil');
+      return;
+    }
+    
+    await notificationService.sendLocalNotification(
+      '¡Prueba exitosa! 🎉',
+      'Las notificaciones están funcionando correctamente.',
+      { type: 'test' }
+    );
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -189,30 +284,94 @@ export default function SettingsScreen() {
 
         {/* Info Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configuración</Text>
+          <Text style={styles.sectionTitle}>Notificaciones</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleToggleNotifications}>
             <View style={styles.menuItemLeft}>
               <View style={[styles.menuIcon, { backgroundColor: colors.primary + '20' }]}>
                 <Ionicons name="notifications" size={20} color={colors.primary} />
               </View>
-              <Text style={styles.menuItemText}>Notificaciones</Text>
+              <View>
+                <Text style={styles.menuItemText}>Notificaciones Push</Text>
+                <Text style={styles.menuItemSubtext}>
+                  {Platform.OS === 'web' ? 'Solo en móvil' : notificationsEnabled ? 'Activadas' : 'Desactivadas'}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: notificationsEnabled ? colors.success + '20' : colors.textMuted + '20' }]}>
+              <Text style={[styles.statusText, { color: notificationsEnabled ? colors.success : colors.textMuted }]}>
+                {notificationsEnabled ? 'ON' : 'OFF'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.menuItem}>
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.warning + '20' }]}>
+                <Ionicons name="alarm" size={20} color={colors.warning} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuItemText}>Recordatorio Diario</Text>
+                <Text style={styles.menuItemSubtext}>
+                  Te avisamos cuando termina tu jornada
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={dailyReminderEnabled}
+              onValueChange={handleToggleDailyReminder}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={dailyReminderEnabled ? colors.primary : colors.textMuted}
+            />
+          </View>
+
+          {dailyReminderEnabled && (
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => setNotificationModalVisible(true)}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.menuIcon, { backgroundColor: colors.primaryDark + '20' }]}>
+                  <Ionicons name="time" size={20} color={colors.primaryDark} />
+                </View>
+                <View>
+                  <Text style={styles.menuItemText}>Hora del Recordatorio</Text>
+                  <Text style={styles.menuItemSubtext}>
+                    {reminderHour.padStart(2, '0')}:{reminderMinute.padStart(2, '0')}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.menuItem} onPress={handleTestNotification}>
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIcon, { backgroundColor: colors.success + '20' }]}>
+                <Ionicons name="paper-plane" size={20} color={colors.success} />
+              </View>
+              <Text style={styles.menuItemText}>Probar Notificación</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </TouchableOpacity>
+        </View>
 
-          <TouchableOpacity style={styles.menuItem}>
+        {/* Sync Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sincronización</Text>
+          
+          <View style={styles.menuItem}>
             <View style={styles.menuItemLeft}>
               <View style={[styles.menuIcon, { backgroundColor: colors.success + '20' }]}>
                 <Ionicons name="cloud" size={20} color={colors.success} />
               </View>
-              <Text style={styles.menuItemText}>Sincronización</Text>
+              <Text style={styles.menuItemText}>Estado</Text>
             </View>
             <View style={styles.syncStatus}>
               <View style={styles.syncDot} />
               <Text style={styles.syncText}>Activa</Text>
             </View>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Logout */}
@@ -308,6 +467,57 @@ export default function SettingsScreen() {
                 style={styles.modalButton}
               />
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Notification Time Modal */}
+      <Modal visible={notificationModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Hora del Recordatorio</Text>
+              <TouchableOpacity onPress={() => setNotificationModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              ¿A qué hora quieres recibir el recordatorio diario?
+            </Text>
+
+            <View style={styles.timePickerRow}>
+              <View style={styles.timePickerInput}>
+                <Input
+                  label="Hora"
+                  value={reminderHour}
+                  onChangeText={setReminderHour}
+                  placeholder="20"
+                  keyboardType="numeric"
+                />
+              </View>
+              <Text style={styles.timeSeparator}>:</Text>
+              <View style={styles.timePickerInput}>
+                <Input
+                  label="Minutos"
+                  value={reminderMinute}
+                  onChangeText={setReminderMinute}
+                  placeholder="00"
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            <Text style={styles.helpText}>
+              Recibirás una notificación para recordarte cerrar tu jornada y registrar gastos.
+            </Text>
+
+            <Button
+              title="Guardar Hora"
+              onPress={handleSaveReminderTime}
+              size="large"
+              style={styles.modalButton}
+            />
           </View>
         </View>
       </Modal>
@@ -453,6 +663,20 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '500',
   },
+  menuItemSubtext: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   syncStatus: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -515,5 +739,25 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     marginTop: spacing.md,
+  },
+  modalSubtitle: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  timePickerInput: {
+    flex: 1,
+  },
+  timeSeparator: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
   },
 });

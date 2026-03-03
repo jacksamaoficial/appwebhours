@@ -11,10 +11,10 @@ export const colors = {
   textSecondary: '#9CA3AF',
   textMuted: '#6B7280',
   
-  // Accent
-  primary: '#6366F1', // Indigo
-  primaryLight: '#818CF8',
-  primaryDark: '#4F46E5',
+  // Accent - Turquoise
+  primary: '#00CED1', // Dark Turquoise
+  primaryLight: '#40E0D0',
+  primaryDark: '#008B8B',
   
   // Status
   success: '#10B981',
