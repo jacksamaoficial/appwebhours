@@ -16,7 +16,7 @@ import { colors, spacing } from '../../src/utils/colors';
 import { Button } from '../../src/components/Button';
 import { Input } from '../../src/components/Input';
 import { useDataStore } from '../../src/store/dataStore';
-import { format, subDays, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
+import { format, subDays, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Job, WorkEntry, RestDay } from '../../src/types';
 
@@ -272,6 +272,13 @@ export default function WorkScreen() {
     start: startOfMonth(selectedDate),
     end: endOfMonth(selectedDate),
   });
+
+  // Calculate empty cells at the start (to align with weekday)
+  // getDay returns 0 for Sunday, 1 for Monday, etc.
+  // We want Monday = 0, so we adjust: (getDay + 6) % 7
+  const firstDayOfMonth = startOfMonth(selectedDate);
+  const startDayIndex = (getDay(firstDayOfMonth) + 6) % 7; // Convert to Monday-based index
+  const emptyDays = Array(startDayIndex).fill(null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -715,6 +722,11 @@ export default function WorkScreen() {
             </View>
 
             <View style={styles.calendarGrid}>
+              {/* Empty cells for alignment */}
+              {emptyDays.map((_, index) => (
+                <View key={`empty-${index}`} style={styles.calendarDay} />
+              ))}
+              {/* Actual days */}
               {calendarDays.map((day) => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const hasEntries = getEntriesForDate(dateStr).length > 0;
