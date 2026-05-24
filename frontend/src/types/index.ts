@@ -1,90 +1,135 @@
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
 export interface User {
-  user_id: string;
+  id: string;
   email: string;
-  name: string;
-  picture?: string;
+  full_name: string;
+  is_active: boolean;
+  created_at: string;
 }
 
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  full_name: string;
+}
+
+// ─── Jobs ────────────────────────────────────────────────────────────────────
+
 export interface Job {
-  job_id: string;
+  id: string;
   user_id: string;
   name: string;
-  base_salary: number;
-  hours_per_week: number;
-  hourly_rate: number;
-  standard_start: string;
-  standard_end: string;
+  description: string | null;
+  hourly_rate: number | null;
+  currency: string;
+  color: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export interface WorkEntry {
-  entry_id: string;
+export interface JobCreate {
+  name: string;
+  description?: string | null;
+  hourly_rate?: number | null;
+  currency?: string;
+  color?: string;
+}
+
+export interface JobUpdate {
+  name?: string;
+  description?: string | null;
+  hourly_rate?: number | null;
+  currency?: string;
+  color?: string;
+  is_active?: boolean;
+}
+
+// ─── Time Entries ─────────────────────────────────────────────────────────────
+
+export interface TimeEntry {
+  id: string;
   user_id: string;
   job_id: string;
-  date: string;
-  start_time: string;
-  end_time?: string;
-  is_next_day: boolean;
-  regular_hours: number;
-  extra_hours: number;
-  regular_earnings: number;
-  extra_earnings: number;
-  total_earnings: number;
-  notes?: string;
+  date: string;          // YYYY-MM-DD
+  start_time: string;    // HH:MM:SS
+  end_time: string | null;
+  duration_minutes: number | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface Expense {
-  expense_id: string;
-  user_id: string;
+export interface TimeEntryCreate {
+  job_id: string;
   date: string;
-  category: string;
-  description: string;
-  amount: number;
-  created_at: string;
+  start_time: string;
+  end_time?: string | null;
+  notes?: string | null;
 }
 
-export interface RestDay {
-  rest_id: string;
-  user_id: string;
-  date: string;
+export interface TimeEntryUpdate {
   job_id?: string;
-  notes?: string;
-  created_at: string;
+  date?: string;
+  start_time?: string;
+  end_time?: string | null;
+  notes?: string | null;
 }
 
-export interface DashboardSummary {
-  month: string;
-  total_regular_earnings: number;
-  total_extra_earnings: number;
-  total_earnings: number;
-  total_expenses: number;
-  net_balance: number;
-  savings_rate: number;
-  health_message: string;
-  work_entries_count: number;
-  expenses_count: number;
-}
+// ─── Expenses ────────────────────────────────────────────────────────────────
 
-export interface WeeklyData {
-  week_start: string;
-  week_end: string;
-  week_label: string;
-  income: number;
-  expenses: number;
-  balance: number;
-}
+export type ExpenseCategory =
+  | 'transport'
+  | 'food'
+  | 'equipment'
+  | 'software'
+  | 'office'
+  | 'other';
 
-export interface HistoryItem {
-  type: 'work' | 'expense';
+export interface Expense {
   id: string;
+  user_id: string;
+  job_id: string | null;
   date: string;
-  title: string;
-  subtitle: string;
   amount: number;
-  is_income: boolean;
+  currency: string;
+  category: ExpenseCategory;
+  description: string;
   created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseCreate {
+  job_id?: string | null;
+  date: string;
+  amount: number;
+  currency?: string;
+  category?: ExpenseCategory;
+  description: string;
+}
+
+export interface ExpenseUpdate {
+  job_id?: string | null;
+  date?: string;
+  amount?: number;
+  currency?: string;
+  category?: ExpenseCategory;
+  description?: string;
+}
+
+// ─── API errors ──────────────────────────────────────────────────────────────
+
+export interface ApiError {
+  detail: string;
 }
