@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
-from app.models.user import User
+from app.models.user import Role, User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from app.services.auth import AuthService
 
@@ -36,9 +37,26 @@ async def get_current_user(
 
     service = AuthService(db)
     try:
-        return await service.get_by_id(uuid.UUID(user_id))
+        user = await service.get_by_id(uuid.UUID(user_id))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    # Deactivated employees lose access immediately, not when their token expires.
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is disabled")
+    return user
+
+
+def require_role(minimum: Role) -> Callable[..., Awaitable[User]]:
+    """Dependency factory: the current user must have at least `minimum` role."""
+
+    async def dependency(current_user: User = Depends(get_current_user)) -> User:
+        if not current_user.has_role(minimum):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
+        return current_user
+
+    return dependency
 
 
 # ---------------------------------------------------------------------------

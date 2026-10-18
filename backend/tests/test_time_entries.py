@@ -7,7 +7,7 @@ from httpx import AsyncClient
 async def _setup(client: AsyncClient, email: str) -> tuple[str, str]:
     await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "Password1", "full_name": "T"},
+        json={"email": email, "password": "Password1", "full_name": "T", "business_name": "Pub"},
     )
     login = await client.post(
         "/api/v1/auth/login", json={"email": email, "password": "Password1"}

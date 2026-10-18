@@ -16,6 +16,12 @@ class TimeEntry(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -25,7 +31,8 @@ class TimeEntry(Base):
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
-    # Computed when end_time is set; stored for fast queries
+    # Computed when end_time is set; stored for fast queries.
+    # An end_time earlier than start_time means the shift ended after midnight.
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

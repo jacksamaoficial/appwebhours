@@ -8,10 +8,11 @@ interface UseExpensesParams {
   job_id?: string;
 }
 
-export function useExpenses(params: UseExpensesParams = {}) {
+export function useExpenses(params: UseExpensesParams = {}, enabled = true) {
   return useQuery({
     queryKey: ['expenses', params],
     queryFn: () => getExpenses(params),
+    enabled,
   });
 }
 

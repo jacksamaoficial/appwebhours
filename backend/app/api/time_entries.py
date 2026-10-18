@@ -18,6 +18,7 @@ router = APIRouter(prefix="/time-entries", tags=["time-entries"])
 @router.get("", response_model=list[TimeEntryResponse])
 async def list_entries(
     entry_date: date | None = Query(default=None, alias="date"),
+    user_id: uuid.UUID | None = Query(default=None),
     job_id: uuid.UUID | None = Query(default=None),
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
@@ -26,7 +27,8 @@ async def list_entries(
 ) -> list[TimeEntryResponse]:
     service = TimeEntryService(db)
     entries = await service.list_entries(
-        current_user.id,
+        current_user,
+        user_id=user_id,
         entry_date=entry_date,
         job_id=job_id,
         from_date=from_date,
@@ -43,7 +45,7 @@ async def create_entry(
 ) -> TimeEntryResponse:
     service = TimeEntryService(db)
     try:
-        entry = await service.create_entry(current_user.id, data)
+        entry = await service.create_entry(current_user, data)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return TimeEntryResponse.model_validate(entry)
@@ -57,7 +59,7 @@ async def get_entry(
 ) -> TimeEntryResponse:
     service = TimeEntryService(db)
     try:
-        entry = await service.get_entry(current_user.id, entry_id)
+        entry = await service.get_entry(current_user, entry_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return TimeEntryResponse.model_validate(entry)
@@ -72,7 +74,7 @@ async def update_entry(
 ) -> TimeEntryResponse:
     service = TimeEntryService(db)
     try:
-        entry = await service.update_entry(current_user.id, entry_id, data)
+        entry = await service.update_entry(current_user, entry_id, data)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return TimeEntryResponse.model_validate(entry)
@@ -86,6 +88,6 @@ async def delete_entry(
 ) -> None:
     service = TimeEntryService(db)
     try:
-        await service.delete_entry(current_user.id, entry_id)
+        await service.delete_entry(current_user, entry_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

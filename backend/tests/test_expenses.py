@@ -7,7 +7,7 @@ from httpx import AsyncClient
 async def _setup(client: AsyncClient, email: str) -> tuple[str, str]:
     await client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "Password1", "full_name": "T"},
+        json={"email": email, "password": "Password1", "full_name": "T", "business_name": "Pub"},
     )
     login = await client.post(
         "/api/v1/auth/login", json={"email": email, "password": "Password1"}
@@ -30,15 +30,15 @@ async def test_create_expense(client: AsyncClient) -> None:
             "date": "2026-05-25",
             "amount": 49.99,
             "currency": "EUR",
-            "category": "software",
-            "description": "GitHub Copilot",
+            "category": "drinks",
+            "description": "Pedido de ginebra",
         },
         headers=headers,
     )
     assert resp.status_code == 201
     data = resp.json()
     assert data["amount"] == 49.99
-    assert data["category"] == "software"
+    assert data["category"] == "drinks"
 
 
 @pytest.mark.asyncio

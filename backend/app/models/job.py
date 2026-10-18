@@ -16,8 +16,11 @@ class Job(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
@@ -37,7 +40,6 @@ class Job(Base):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="jobs", lazy="raise")  # noqa: F821
     time_entries: Mapped[list["TimeEntry"]] = relationship(  # noqa: F821
         "TimeEntry", back_populates="job", lazy="raise"
     )

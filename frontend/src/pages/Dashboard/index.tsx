@@ -1,9 +1,13 @@
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, Receipt, Briefcase, TrendingUp } from 'lucide-react';
+import { Clock, Receipt, Briefcase, TrendingUp, Wallet } from 'lucide-react';
 import { useTimeEntries } from '../../hooks/useTimeEntries';
 import { useExpenses } from '../../hooks/useExpenses';
 import { useJobs } from '../../hooks/useJobs';
+import { useEmployees } from '../../hooks/useBusiness';
+import { useBusinessDays } from '../../hooks/useBusinessDays';
+import { useAuthStore } from '../../store/authStore';
+import { hasRole } from '../../lib/permissions';
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -12,6 +16,10 @@ function formatMinutes(minutes: number): string {
 }
 
 export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+  const isOwner = hasRole(user, 'owner');
+  const canExpenses = hasRole(user, 'hours_expenses');
+  const canSales = hasRole(user, 'hours_expenses_sales');
   const today = new Date();
   const weekStart = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
   const weekEnd = format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
@@ -20,39 +28,55 @@ export default function DashboardPage() {
 
   const { data: todayEntries = [] } = useTimeEntries({ date: format(today, 'yyyy-MM-dd') });
   const { data: weekEntries = [] } = useTimeEntries({ from_date: weekStart, to_date: weekEnd });
-  const { data: monthExpenses = [] } = useExpenses({ from_date: monthStart, to_date: monthEnd });
+  const { data: monthExpenses = [] } = useExpenses(
+    { from_date: monthStart, to_date: monthEnd },
+    canExpenses,
+  );
+  const { data: monthDays = [] } = useBusinessDays(
+    { from_date: monthStart, to_date: monthEnd },
+    canSales,
+  );
   const { data: jobs = [] } = useJobs();
+  const { data: employees = [] } = useEmployees(isOwner);
 
   const todayMinutes = todayEntries.reduce((s, e) => s + (e.duration_minutes ?? 0), 0);
   const weekMinutes = weekEntries.reduce((s, e) => s + (e.duration_minutes ?? 0), 0);
   const monthExpenseTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
+  const monthSalesTotal = monthDays.reduce((s, d) => s + d.total, 0);
 
   const stats = [
     {
-      label: 'Hoy',
+      // The owner sees everyone's hours; employees only their own.
+      label: isOwner ? 'Horas del equipo hoy' : 'Hoy',
       value: formatMinutes(todayMinutes),
       icon: Clock,
       color: 'text-indigo-600 bg-indigo-50',
     },
     {
-      label: 'Esta semana',
+      label: isOwner ? 'Horas del equipo esta semana' : 'Esta semana',
       value: formatMinutes(weekMinutes),
       icon: TrendingUp,
       color: 'text-emerald-600 bg-emerald-50',
     },
-    {
+    canExpenses && {
       label: 'Gastos del mes',
       value: `${monthExpenseTotal.toFixed(2)} €`,
       icon: Receipt,
       color: 'text-orange-600 bg-orange-50',
     },
-    {
-      label: 'Trabajos activos',
-      value: String(jobs.length),
+    canSales && {
+      label: 'Ventas netas del mes',
+      value: `${monthSalesTotal.toFixed(2)} €`,
+      icon: Wallet,
+      color: 'text-sky-600 bg-sky-50',
+    },
+    isOwner && {
+      label: 'Personal activo',
+      value: String(employees.filter((e) => e.is_active).length),
       icon: Briefcase,
       color: 'text-violet-600 bg-violet-50',
     },
-  ];
+  ].filter((stat) => !!stat);
 
   return (
     <div className="space-y-6">
@@ -85,6 +109,7 @@ export default function DashboardPage() {
           <ul className="space-y-2">
             {todayEntries.map((entry) => {
               const job = jobs.find((j) => j.id === entry.job_id);
+              const employee = isOwner ? employees.find((e) => e.id === entry.user_id) : null;
               return (
                 <li key={entry.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
@@ -94,10 +119,14 @@ export default function DashboardPage() {
                         style={{ backgroundColor: job.color }}
                       />
                     )}
-                    <span className="font-medium text-gray-800">{job?.name ?? entry.job_id}</span>
+                    <span className="font-medium text-gray-800">
+                      {employee ? `${employee.full_name} · ` : ''}
+                      {job?.name ?? entry.job_id}
+                    </span>
                     <span className="text-gray-400">
                       {entry.start_time.slice(0, 5)}
                       {entry.end_time ? ` → ${entry.end_time.slice(0, 5)}` : ' (en curso)'}
+                      {entry.end_time && entry.end_time <= entry.start_time && ' (+1)'}
                     </span>
                   </div>
                   <span className="text-gray-600">

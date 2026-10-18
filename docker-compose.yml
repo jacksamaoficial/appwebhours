@@ -32,10 +32,34 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: 7
       ALLOWED_ORIGINS: http://localhost:5173
       ENVIRONMENT: development
+      BACKUP_DIR: /backups
+      # Emails that can open the admin panel (backup / restore), comma-separated
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     ports:
       - "8001:8000"
     volumes:
       - ./backend:/app
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+
+  # Daily database backup (cron). Files land in ./backups on the host.
+  backup:
+    build: ./deploy/backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-appuser}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-appwebhours}
+      TZ: ${TZ:-Europe/Madrid}
+      BACKUP_CRON: ${BACKUP_CRON:-0 6 * * *}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      # Optional off-site copy with rclone, e.g. gdrive:jacksocialclub-backups
+      BACKUP_RCLONE_REMOTE: ${BACKUP_RCLONE_REMOTE:-}
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+    volumes:
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+      - ./deploy/backup/rclone:/config/rclone
 
   frontend:
     build:

@@ -5,8 +5,15 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import create_access_token, create_refresh_token, hash_password, verify_password, decode_token
-from app.models.user import User
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
+from app.models.business import Business
+from app.models.user import Role, User
 from app.schemas.auth import RegisterRequest
 
 
@@ -19,7 +26,13 @@ class AuthService:
         if existing is not None:
             raise ValueError("Email already registered")
 
+        business = Business(name=data.business_name)
+        self._db.add(business)
+        await self._db.flush()
+
         user = User(
+            business_id=business.id,
+            role=Role.OWNER.value,
             email=data.email,
             hashed_password=hash_password(data.password),
             full_name=data.full_name,

@@ -8,7 +8,7 @@ from httpx import AsyncClient
 async def test_register(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/auth/register",
-        json={"email": "test@example.com", "password": "Password1", "full_name": "Test User"},
+        json={"email": "test@example.com", "password": "Password1", "full_name": "Test User", "business_name": "Pub"},
     )
     assert response.status_code == 201
     data = response.json()
@@ -18,7 +18,7 @@ async def test_register(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_register_duplicate(client: AsyncClient) -> None:
-    payload = {"email": "dup@example.com", "password": "Password1", "full_name": "Dup User"}
+    payload = {"email": "dup@example.com", "password": "Password1", "full_name": "Dup User", "business_name": "Pub"}
     await client.post("/api/v1/auth/register", json=payload)
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 409
@@ -28,7 +28,7 @@ async def test_register_duplicate(client: AsyncClient) -> None:
 async def test_login(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "login@example.com", "password": "Password1", "full_name": "Login User"},
+        json={"email": "login@example.com", "password": "Password1", "full_name": "Login User", "business_name": "Pub"},
     )
     response = await client.post(
         "/api/v1/auth/login",
@@ -42,7 +42,7 @@ async def test_login(client: AsyncClient) -> None:
 async def test_login_wrong_password(client: AsyncClient) -> None:
     await client.post(
         "/api/v1/auth/register",
-        json={"email": "badpass@example.com", "password": "Password1", "full_name": "Bad"},
+        json={"email": "badpass@example.com", "password": "Password1", "full_name": "Bad", "business_name": "Pub"},
     )
     response = await client.post(
         "/api/v1/auth/login",
@@ -55,7 +55,7 @@ async def test_login_wrong_password(client: AsyncClient) -> None:
 async def test_me(client: AsyncClient) -> None:
     reg = await client.post(
         "/api/v1/auth/register",
-        json={"email": "me@example.com", "password": "Password1", "full_name": "Me User"},
+        json={"email": "me@example.com", "password": "Password1", "full_name": "Me User", "business_name": "Pub"},
     )
     token = reg.json()["access_token"]
     response = await client.get(

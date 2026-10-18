@@ -9,11 +9,19 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class ExpenseCategory(str, Enum):
-    TRANSPORT = "transport"
+    DRINKS = "drinks"
+    ICE = "ice"
     FOOD = "food"
+    SUPPLIES = "supplies"
+    CLEANING = "cleaning"
+    STAFF = "staff"
+    RENT = "rent"
+    UTILITIES = "utilities"
+    MAINTENANCE = "maintenance"
     EQUIPMENT = "equipment"
-    SOFTWARE = "software"
-    OFFICE = "office"
+    ENTERTAINMENT = "entertainment"
+    MARKETING = "marketing"
+    FEES = "fees"
     OTHER = "other"
 
 
@@ -49,6 +57,7 @@ class ExpenseResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
+    business_id: uuid.UUID
     user_id: uuid.UUID
     job_id: uuid.UUID | None
     date: dt_date

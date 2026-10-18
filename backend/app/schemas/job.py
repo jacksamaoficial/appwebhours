@@ -37,7 +37,7 @@ class JobResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
-    user_id: uuid.UUID
+    business_id: uuid.UUID
     name: str
     description: str | None
     hourly_rate: float | None

@@ -57,6 +57,36 @@ cp .env.example .env
 npm run dev
 ```
 
+## Copias de seguridad
+
+### Automáticas (cron)
+El servicio `backup` de Docker Compose hace un `pg_dump` cada día a las **06:00 (hora de Madrid)** y lo guarda en `./backups` del servidor. Las copias automáticas se conservan 30 días; las manuales y las subidas no caducan.
+
+Variables (en `.env` junto a `docker-compose.yml`):
+
+| Variable | Por defecto | Uso |
+|---|---|---|
+| `BACKUP_CRON` | `0 6 * * *` | Horario (formato cron) |
+| `TZ` | `Europe/Madrid` | Zona horaria del horario |
+| `BACKUP_RETENTION_DAYS` | `30` | Días que se guardan las copias automáticas |
+| `BACKUP_HOST_DIR` | `./backups` | Carpeta del servidor donde se guardan |
+| `BACKUP_RCLONE_REMOTE` | *(vacío)* | Copia externa opcional con rclone, p. ej. `gdrive:jacksocialclub-backups` (config en `deploy/backup/rclone/rclone.conf`) |
+| `ADMIN_EMAILS` | *(vacío)* | Emails que pueden abrir el panel de copias |
+
+Copia manual desde el servidor: `docker compose exec backup backup.sh manual`
+
+### Panel de administración
+Los usuarios cuyo email está en `ADMIN_EMAILS` ven **Copias de seguridad** en el menú: crear una copia, descargarla, subir un archivo `.dump` y restaurar. Restaurar pide escribir `RESTAURAR`, guarda antes una copia del estado actual y se hace en una sola transacción (si falla, los datos no cambian).
+
+### Recuperación si la app no arranca
+```bash
+docker compose exec backup restore.sh appwebhours-20261018-060000-auto.dump
+docker compose restart backend   # aplica migraciones pendientes
+```
+En un servidor nuevo: despliega, copia el `.dump` en `./backups` y ejecuta lo anterior.
+
+> Las copias en el mismo servidor no protegen si se pierde el servidor. Descarga copias periódicamente o configura `BACKUP_RCLONE_REMOTE`.
+
 ## Tests
 
 ```bash
@@ -108,7 +138,26 @@ GET|PATCH|DELETE /api/v1/time-entries/{id}
 
 GET|POST         /api/v1/expenses
 GET|PATCH|DELETE /api/v1/expenses/{id}
+
+GET|PATCH        /api/v1/business
+GET|POST         /api/v1/admin/backups              (solo ADMIN_EMAILS)
+POST             /api/v1/admin/backups/upload
+GET              /api/v1/admin/backups/{name}/download
+POST             /api/v1/admin/backups/{name}/restore
+DELETE           /api/v1/admin/backups/{name}
+
+GET|POST         /api/v1/employees
+PATCH            /api/v1/employees/{id}
+
+GET              /api/v1/business-days
+GET              /api/v1/business-days/closed
+GET              /api/v1/business-days/{date}
+PUT              /api/v1/business-days/{date}/sales
+POST             /api/v1/business-days/{date}/close
+POST             /api/v1/business-days/{date}/reopen
 ```
+
+Perfiles y reglas de negocio (roles, días cerrados, turnos de noche): ver [context.md](context.md).
 
 Documentación interactiva disponible en `http://localhost:8000/docs` (solo en `ENVIRONMENT=development`).
 

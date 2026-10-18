@@ -10,9 +10,20 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.api import auth_router, expenses_router, jobs_router, time_entries_router
+from app.api import (
+    admin_router,
+    auth_router,
+    business_days_router,
+    business_router,
+    employees_router,
+    expenses_router,
+    jobs_router,
+    payroll_router,
+    time_entries_router,
+)
 from app.core.config import settings
 from app.core.database import engine
+from app.services.business_days import DayClosedError
 
 
 @asynccontextmanager
@@ -37,6 +48,17 @@ app = FastAPI(
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+
+@app.exception_handler(DayClosedError)
+async def day_closed_handler(_request: Request, exc: DayClosedError) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
+@app.exception_handler(PermissionError)
+async def permission_error_handler(_request: Request, exc: PermissionError) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
+
 
 # CORS
 app.add_middleware(
@@ -67,3 +89,8 @@ app.include_router(auth_router, prefix=PREFIX)
 app.include_router(jobs_router, prefix=PREFIX)
 app.include_router(time_entries_router, prefix=PREFIX)
 app.include_router(expenses_router, prefix=PREFIX)
+app.include_router(business_router, prefix=PREFIX)
+app.include_router(business_days_router, prefix=PREFIX)
+app.include_router(employees_router, prefix=PREFIX)
+app.include_router(payroll_router, prefix=PREFIX)
+app.include_router(admin_router, prefix=PREFIX)

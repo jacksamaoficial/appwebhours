@@ -52,7 +52,11 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // A 401 from /auth/* (login, refresh…) is a final answer, not an expired
+    // access token: retrying it would loop forever.
+    const isAuthRequest = originalRequest.url?.startsWith('/auth/') ?? false;
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       if (_isRefreshing) {
         return new Promise((resolve, reject) => {
           _failedQueue.push({ resolve, reject });
@@ -78,7 +82,11 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         setAccessToken(null);
-        window.location.href = '/login';
+        const base = import.meta.env.BASE_URL; // '/' or e.g. '/gestion/'
+        const page = window.location.pathname.slice(base.length - 1);
+        if (!['/login', '/register'].includes(page)) {
+          window.location.href = `${base}login`;
+        }
         return Promise.reject(refreshError);
       } finally {
         _isRefreshing = false;

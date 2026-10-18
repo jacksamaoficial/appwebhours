@@ -3,6 +3,7 @@ import type { TimeEntry, TimeEntryCreate, TimeEntryUpdate } from '../types';
 
 interface ListParams {
   date?: string;
+  user_id?: string;
   job_id?: string;
   from_date?: string;
   to_date?: string;

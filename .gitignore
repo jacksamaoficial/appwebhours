@@ -46,6 +46,11 @@ desktop.ini
 # ─── Docker ───────────────────────────────────────────────────────────────────
 docker-compose.override.yml
 
+# ─── Backups (database dumps contain personal data) ──────────────────────────
+backups/
+deploy/backup/rclone/*
+!deploy/backup/rclone/.gitkeep
+
 # ─── NO AI agent artifacts ───────────────────────────────────────────────────
 .emergent/
 memory/

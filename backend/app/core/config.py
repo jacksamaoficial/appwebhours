@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
 
+    # Backups (pg_dump custom format files)
+    BACKUP_DIR: str = "backups"
+    # Comma-separated emails allowed into the admin panel (backup / restore)
+    ADMIN_EMAILS: str = ""
+
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_min_length(cls, v: str) -> str:
@@ -39,6 +44,10 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def admin_emails(self) -> set[str]:
+        return {e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()}
 
     @property
     def is_development(self) -> bool:

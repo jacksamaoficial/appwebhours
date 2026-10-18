@@ -9,6 +9,12 @@ import DashboardPage from './pages/Dashboard';
 import TimeTrackerPage from './pages/TimeTracker';
 import ExpensesPage from './pages/Expenses';
 import JobsPage from './pages/Jobs';
+import SalesPage from './pages/Sales';
+import EmployeesPage from './pages/Employees';
+import PayrollPage from './pages/Payroll';
+import RequireRole from './components/RequireRole';
+import RequireAdmin from './components/RequireAdmin';
+import BackupsPage from './pages/Admin/Backups';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +38,7 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
         <AuthInitializer>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -40,8 +46,27 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/tracker" element={<TimeTrackerPage />} />
-              <Route path="/expenses" element={<ExpensesPage />} />
-              <Route path="/jobs" element={<JobsPage />} />
+              <Route
+                path="/expenses"
+                element={<RequireRole role="hours_expenses"><ExpensesPage /></RequireRole>}
+              />
+              <Route
+                path="/sales"
+                element={<RequireRole role="hours_expenses_sales"><SalesPage /></RequireRole>}
+              />
+              <Route path="/jobs" element={<RequireRole role="owner"><JobsPage /></RequireRole>} />
+              <Route
+                path="/employees"
+                element={<RequireRole role="owner"><EmployeesPage /></RequireRole>}
+              />
+              <Route
+                path="/payroll"
+                element={<RequireRole role="owner"><PayrollPage /></RequireRole>}
+              />
+              <Route
+                path="/admin/backups"
+                element={<RequireAdmin><BackupsPage /></RequireAdmin>}
+              />
             </Route>
           </Routes>
         </AuthInitializer>

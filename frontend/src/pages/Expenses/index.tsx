@@ -1,16 +1,26 @@
 import { useState } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { Plus, Trash2 } from 'lucide-react';
+import { Lock, Plus, Trash2 } from 'lucide-react';
 import { useExpenses, useCreateExpense, useDeleteExpense } from '../../hooks/useExpenses';
 import { useJobs } from '../../hooks/useJobs';
+import { useClosedDays } from '../../hooks/useBusinessDays';
+import { apiErrorMessage } from '../../lib/errors';
 import type { ExpenseCategory, ExpenseCreate } from '../../types';
 
 const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
-  { value: 'transport', label: 'Transporte' },
-  { value: 'food', label: 'Alimentación' },
-  { value: 'equipment', label: 'Equipamiento' },
-  { value: 'software', label: 'Software' },
-  { value: 'office', label: 'Oficina' },
+  { value: 'drinks', label: 'Bebidas y licores' },
+  { value: 'ice', label: 'Hielo' },
+  { value: 'food', label: 'Comida y snacks' },
+  { value: 'supplies', label: 'Consumibles (vasos, pajitas, servilletas)' },
+  { value: 'cleaning', label: 'Limpieza' },
+  { value: 'staff', label: 'Personal y extras' },
+  { value: 'rent', label: 'Alquiler' },
+  { value: 'utilities', label: 'Suministros (luz, agua, gas, internet)' },
+  { value: 'maintenance', label: 'Reparaciones y mantenimiento' },
+  { value: 'equipment', label: 'Equipamiento y mobiliario' },
+  { value: 'entertainment', label: 'Música, DJ y eventos' },
+  { value: 'marketing', label: 'Publicidad y promoción' },
+  { value: 'fees', label: 'Impuestos, tasas y licencias' },
   { value: 'other', label: 'Otros' },
 ];
 
@@ -30,9 +40,11 @@ export default function ExpensesPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<ExpenseCreate>({ ...emptyForm });
+  const [error, setError] = useState('');
 
   const { data: expenses = [], isLoading } = useExpenses({ from_date: monthStart, to_date: monthEnd });
   const { data: jobs = [] } = useJobs();
+  const { closed } = useClosedDays({ from_date: monthStart, to_date: monthEnd });
   const createExpense = useCreateExpense();
   const deleteExpense = useDeleteExpense();
 
@@ -40,12 +52,26 @@ export default function ExpensesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createExpense.mutateAsync({
-      ...form,
-      job_id: form.job_id || null,
-    });
-    setForm({ ...emptyForm });
-    setShowForm(false);
+    setError('');
+    try {
+      await createExpense.mutateAsync({
+        ...form,
+        job_id: form.job_id || null,
+      });
+      setForm({ ...emptyForm });
+      setShowForm(false);
+    } catch (err) {
+      setError(apiErrorMessage(err, 'No se pudo guardar el gasto.'));
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setError('');
+    try {
+      await deleteExpense.mutateAsync(id);
+    } catch (err) {
+      setError(apiErrorMessage(err, 'No se pudo eliminar el gasto.'));
+    }
   };
 
   return (
@@ -66,6 +92,8 @@ export default function ExpensesPage() {
           Nuevo gasto
         </button>
       </div>
+
+      {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {/* Form */}
       {showForm && (
@@ -109,13 +137,13 @@ export default function ExpensesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Trabajo (opcional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Puesto (opcional)</label>
               <select
                 value={form.job_id ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, job_id: e.target.value || null }))}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               >
-                <option value="">Sin trabajo</option>
+                <option value="">Sin puesto</option>
                 {jobs.map((j) => (
                   <option key={j.id} value={j.id}>
                     {j.name}
@@ -179,13 +207,17 @@ export default function ExpensesPage() {
                     <span className="text-sm font-semibold text-gray-900">
                       {expense.amount.toFixed(2)} {expense.currency}
                     </span>
-                    <button
-                      onClick={() => void deleteExpense.mutateAsync(expense.id)}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                      aria-label="Eliminar gasto"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {closed.has(expense.date) ? (
+                      <Lock className="h-4 w-4 text-gray-300" aria-label="Día cerrado" />
+                    ) : (
+                      <button
+                        onClick={() => void handleDelete(expense.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        aria-label="Eliminar gasto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </li>
               );

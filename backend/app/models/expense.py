@@ -11,11 +11,19 @@ from app.core.database import Base
 
 
 class ExpenseCategory(str):
-    TRANSPORT = "transport"
+    DRINKS = "drinks"
+    ICE = "ice"
     FOOD = "food"
+    SUPPLIES = "supplies"
+    CLEANING = "cleaning"
+    STAFF = "staff"
+    RENT = "rent"
+    UTILITIES = "utilities"
+    MAINTENANCE = "maintenance"
     EQUIPMENT = "equipment"
-    SOFTWARE = "software"
-    OFFICE = "office"
+    ENTERTAINMENT = "entertainment"
+    MARKETING = "marketing"
+    FEES = "fees"
     OTHER = "other"
 
 
@@ -24,6 +32,12 @@ class Expense(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    business_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True

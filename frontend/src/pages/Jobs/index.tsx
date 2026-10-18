@@ -33,19 +33,19 @@ export default function JobsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Trabajos</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Puestos</h1>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
         >
           <Plus className="h-4 w-4" />
-          Nuevo trabajo
+          Nuevo puesto
         </button>
       </div>
 
       {showForm && (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">Nuevo trabajo</h2>
+          <h2 className="mb-4 text-base font-semibold text-gray-900">Nuevo puesto</h2>
           <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-2 gap-4 lg:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
@@ -118,7 +118,7 @@ export default function JobsPage() {
           </div>
         ) : jobs.length === 0 ? (
           <div className="p-10 text-center text-sm text-gray-400">
-            No tienes trabajos. Crea el primero.
+            Aún no hay puestos (barra, sala, puerta…). Crea el primero.
           </div>
         ) : (
           <ul className="divide-y divide-gray-100">
@@ -150,7 +150,7 @@ export default function JobsPage() {
                   <button
                     onClick={() => void archiveJob.mutateAsync(job.id)}
                     className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-                    aria-label="Archivar trabajo"
+                    aria-label="Archivar puesto"
                   >
                     <Archive className="h-3.5 w-3.5" />
                     Archivar
