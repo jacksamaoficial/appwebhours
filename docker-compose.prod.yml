@@ -2,8 +2,9 @@
 #   cp deploy/.env.prod.example .env   # fill in the secrets
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
-# Nothing is exposed to the internet directly: the frontend listens on
-# 127.0.0.1:${APP_PORT} and the host's nginx (with HTTPS) proxies to it.
+# Nothing is published to the internet by this file: Traefik (the VPS's shared
+# reverse proxy, in /docker/n8n) routes PUBLIC_HOST to the frontend over the
+# external `traefik-net` network and gets the HTTPS certificate.
 name: jacksocialclub-gestion
 
 services:
@@ -67,8 +68,24 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "127.0.0.1:${APP_PORT:-8210}:80"
+    networks:
+      - default
+      - traefik-net
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-net
+      - traefik.http.routers.jsc-gestion.rule=Host(`${PUBLIC_HOST:-gestion.jacksocialclub.com}`)
+      - traefik.http.routers.jsc-gestion.entrypoints=web,websecure
+      - traefik.http.routers.jsc-gestion.tls=true
+      - traefik.http.routers.jsc-gestion.tls.certresolver=mytlschallenge
+      - traefik.http.routers.jsc-gestion.middlewares=jsc-gestion-headers
+      - traefik.http.middlewares.jsc-gestion-headers.headers.stsSeconds=31536000
+      - traefik.http.middlewares.jsc-gestion-headers.headers.stsIncludeSubdomains=true
+      - traefik.http.services.jsc-gestion.loadbalancer.server.port=80
+
+networks:
+  traefik-net:
+    external: true
 
 volumes:
   postgres_data:

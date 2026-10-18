@@ -87,6 +87,20 @@ En un servidor nuevo: despliega, copia el `.dump` en `./backups` y ejecuta lo an
 
 > Las copias en el mismo servidor no protegen si se pierde el servidor. Descarga copias periódicamente o configura `BACKUP_RCLONE_REMOTE`.
 
+## Despliegue en producción (VPS)
+
+La app corre con `docker-compose.prod.yml` en `/opt/jacksocialclub-gestion`. No publica puertos a internet: **Traefik**, el proxy compartido del VPS (en `/docker/n8n`), enruta `PUBLIC_HOST` al frontend por la red externa `traefik-net` y obtiene el certificado HTTPS (resolver `mytlschallenge`).
+
+```bash
+cp deploy/.env.prod.example .env       # rellenar secretos (openssl rand -hex 32)
+docker compose -f docker-compose.prod.yml up -d --build
+# primera vez: cuenta del dueño (el registro público está cerrado)
+docker compose -f docker-compose.prod.yml exec backend \
+  python -m app.cli create-owner --email EMAIL --name NOMBRE --business "NEGOCIO"
+```
+
+Requisitos: registro DNS **A** del dominio apuntando al VPS y Traefik en marcha con los puertos 80/443. El nginx del sistema no debe escuchar en el puerto 80 (si lo hace, Traefik no arranca).
+
 ## Tests
 
 ```bash
