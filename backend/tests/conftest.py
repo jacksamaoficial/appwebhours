@@ -6,6 +6,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base, get_db
+from app.core.rate_limit import limiter
 from app.main import app
 
 # Use SQLite in-memory for tests (no Postgres needed in CI)
@@ -34,6 +35,7 @@ async def override_get_db():
 
 
 app.dependency_overrides[get_db] = override_get_db
+limiter.enabled = False
 
 
 @pytest_asyncio.fixture

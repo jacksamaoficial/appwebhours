@@ -7,6 +7,8 @@ export function apiErrorMessage(err: unknown, fallback = 'Ha ocurrido un error.'
   const closed = DAY_CLOSED.exec(detail);
   if (closed) return `El día ${closed[1]} está cerrado y no se puede modificar.`;
   if (detail === 'Insufficient permissions') return 'No tienes permiso para esta acción.';
+  if (detail === 'Registration is closed')
+    return 'El registro está cerrado. Pide al dueño del negocio que te cree una cuenta.';
   if (detail === 'Email already registered') return 'Ese email ya está registrado.';
   if (detail === 'Not a pg_dump custom-format file')
     return 'El archivo no es una copia de seguridad válida de esta app (.dump).';

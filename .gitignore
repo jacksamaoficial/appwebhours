@@ -57,3 +57,6 @@ memory/
 test_reports/
 test_result.md
 .gitconfig
+
+# ─── Local credentials (never commit) ────────────────────────────────────────
+Accesos.*

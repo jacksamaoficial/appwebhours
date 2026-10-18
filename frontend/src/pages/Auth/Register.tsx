@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import AuthLayout from '../../components/AuthLayout';
+import { apiErrorMessage } from '../../lib/errors';
 import { useAuthStore } from '../../store/authStore';
 import type { RegisterRequest } from '../../types';
 
@@ -24,10 +25,7 @@ export default function RegisterPage() {
     try {
       await register(form);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-        'Error al registrar. Inténtalo de nuevo.';
-      setError(msg);
+      setError(apiErrorMessage(err, 'Error al registrar. Inténtalo de nuevo.'));
     } finally {
       setLoading(false);
     }

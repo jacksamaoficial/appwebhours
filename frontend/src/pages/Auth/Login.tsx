@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Navigate, Link } from 'react-router-dom';
 import AuthLayout from '../../components/AuthLayout';
+import { getAuthConfig } from '../../api/auth';
 import { useAuthStore } from '../../store/authStore';
 import type { LoginRequest } from '../../types';
 
@@ -9,6 +11,7 @@ export default function LoginPage() {
   const [form, setForm] = useState<LoginRequest>({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { data: authConfig } = useQuery({ queryKey: ['auth-config'], queryFn: getAuthConfig });
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -18,8 +21,13 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(form);
-    } catch {
-      setError('Email o contraseña incorrectos');
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      setError(
+        status === 429
+          ? 'Demasiados intentos. Espera un minuto y vuelve a probar.'
+          : 'Email o contraseña incorrectos',
+      );
     } finally {
       setLoading(false);
     }
@@ -65,12 +73,14 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-gray-500">
-        ¿No tienes cuenta?{' '}
-        <Link to="/register" className="text-indigo-600 hover:underline">
-          Regístrate
-        </Link>
-      </p>
+      {authConfig?.registration_open && (
+        <p className="mt-4 text-center text-sm text-gray-500">
+          ¿No tienes cuenta?{' '}
+          <Link to="/register" className="text-indigo-600 hover:underline">
+            Regístrate
+          </Link>
+        </p>
+      )}
     </AuthLayout>
   );
 }

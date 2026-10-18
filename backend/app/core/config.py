@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
 
+    # Public sign-up (creates a new business). Turn off in production once the
+    # owner account exists: otherwise anyone can create an account.
+    ALLOW_REGISTRATION: bool = True
+
     # Backups (pg_dump custom format files)
     BACKUP_DIR: str = "backups"
     # Comma-separated emails allowed into the admin panel (backup / restore)
@@ -39,6 +43,10 @@ class Settings(BaseSettings):
     def secret_key_min_length(cls, v: str) -> str:
         if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters")
+        # The placeholder from .env.example / docker-compose.yml is public: anyone
+        # could sign valid tokens with it.
+        if v.lower().startswith("changeme"):
+            raise ValueError("SECRET_KEY is the example value; generate one: openssl rand -hex 32")
         return v
 
     @property

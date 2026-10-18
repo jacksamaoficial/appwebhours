@@ -62,6 +62,7 @@ class EmployeeService:
         password = values.pop("password", None)
         if password is not None:
             user.hashed_password = hash_password(password)
+            user.token_version += 1  # sign out everywhere
         if "role" in values and values["role"] is not None:
             values["role"] = values["role"].value
         for field, value in values.items():

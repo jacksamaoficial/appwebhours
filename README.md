@@ -71,7 +71,7 @@ Variables (en `.env` junto a `docker-compose.yml`):
 | `BACKUP_RETENTION_DAYS` | `30` | Días que se guardan las copias automáticas |
 | `BACKUP_HOST_DIR` | `./backups` | Carpeta del servidor donde se guardan |
 | `BACKUP_RCLONE_REMOTE` | *(vacío)* | Copia externa opcional con rclone, p. ej. `gdrive:jacksocialclub-backups` (config en `deploy/backup/rclone/rclone.conf`) |
-| `ADMIN_EMAILS` | *(vacío)* | Emails que pueden abrir el panel de copias |
+| `ADMIN_EMAILS` | *(vacío)* | Emails que pueden abrir el panel de copias. Con el registro abierto, cualquiera podría registrarse con un email de esta lista que aún no tenga cuenta: en producción usa `ALLOW_REGISTRATION=false` |
 
 Copia manual desde el servidor: `docker compose exec backup backup.sh manual`
 
@@ -166,6 +166,9 @@ Documentación interactiva disponible en `http://localhost:8000/docs` (solo en `
 - Contraseñas hasheadas con bcrypt (cost 12)
 - JWT access token (30 min) en memoria + refresh token (7 días) en cookie httpOnly
 - CORS con lista blanca de orígenes
-- Rate limiting en endpoints de auth (slowapi)
+- Rate limiting en endpoints de auth (slowapi): login 10/min, registro 5/h, refresh 30/min por IP
+- Registro público desactivable (`ALLOW_REGISTRATION=false` en producción)
+- Cambiar la contraseña de un empleado cierra todas sus sesiones (`token_version`)
+- La API no arranca con la `SECRET_KEY` de ejemplo
 - Row-level security: cada query filtra por `user_id` del token
 - Secrets exclusivamente en variables de entorno

@@ -18,6 +18,12 @@ export async function logout(): Promise<void> {
   setAccessToken(null);
 }
 
+/** Public: whether sign-up is open (it is closed in production). */
+export async function getAuthConfig(): Promise<{ registration_open: boolean }> {
+  const res = await apiClient.get<{ registration_open: boolean }>('/auth/config');
+  return res.data;
+}
+
 export async function getMe(): Promise<User> {
   const res = await apiClient.get<User>('/auth/me');
   return res.data;

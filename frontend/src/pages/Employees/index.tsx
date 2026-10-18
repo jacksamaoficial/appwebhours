@@ -190,7 +190,17 @@ export default function EmployeesPage() {
                       {!isOwner && <ScheduleSummary userId={employee.id} />}
                     </div>
                     {isOwner ? (
-                      <span className="text-xs font-medium text-indigo-600">{ROLE_LABELS.owner}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-indigo-600">{ROLE_LABELS.owner}</span>
+                        <button
+                          onClick={() => resetPassword(employee)}
+                          className="rounded-lg border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50"
+                          aria-label="Cambiar contraseña"
+                          title="Cambiar contraseña (cerrará tus sesiones)"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex items-center gap-2">
                         <button

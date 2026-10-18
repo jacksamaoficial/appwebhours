@@ -6,9 +6,8 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app.api import (
     admin_router,
@@ -23,6 +22,7 @@ from app.api import (
 )
 from app.core.config import settings
 from app.core.database import engine
+from app.core.rate_limit import limiter
 from app.services.business_days import DayClosedError
 
 
@@ -33,8 +33,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown: dispose the connection pool
     await engine.dispose()
 
-
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="App Control de Horas y Gastos",

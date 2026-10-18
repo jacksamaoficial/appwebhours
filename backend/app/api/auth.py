@@ -4,9 +4,12 @@ import uuid
 from collections.abc import Awaitable, Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limit import LOGIN_LIMIT, REFRESH_LIMIT, REGISTER_LIMIT, limiter
 from app.core.security import decode_token
 from app.models.user import Role, User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
@@ -31,18 +34,21 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     token = auth_header[len("Bearer "):]
     try:
-        user_id = decode_token(token, expected_type="access")
+        claims = decode_token(token, expected_type="access")
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     service = AuthService(db)
     try:
-        user = await service.get_by_id(uuid.UUID(user_id))
+        user = await service.get_by_id(uuid.UUID(claims.user_id))
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     # Deactivated employees lose access immediately, not when their token expires.
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is disabled")
+    # Password reset by the owner logs out every existing session.
+    if claims.version != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked")
     return user
 
 
@@ -63,12 +69,26 @@ def require_role(minimum: Role) -> Callable[..., Awaitable[User]]:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+class AuthConfigResponse(BaseModel):
+    registration_open: bool
+
+
+@router.get("/config", response_model=AuthConfigResponse)
+async def auth_config() -> AuthConfigResponse:
+    """Public: lets the login screen know whether to offer sign-up."""
+    return AuthConfigResponse(registration_open=settings.ALLOW_REGISTRATION)
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(REGISTER_LIMIT)
 async def register(
+    request: Request,
     data: RegisterRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
+    if not settings.ALLOW_REGISTRATION:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is closed")
     service = AuthService(db)
     try:
         _user, access_token, refresh_token = await service.register(data)
@@ -80,7 +100,9 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit(LOGIN_LIMIT)
 async def login(
+    request: Request,
     data: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
@@ -98,6 +120,7 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit(REFRESH_LIMIT)
 async def refresh_token(
     request: Request,
     response: Response,

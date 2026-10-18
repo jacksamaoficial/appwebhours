@@ -1,0 +1,74 @@
+# Production (VPS). Usage:
+#   cp deploy/.env.prod.example .env   # fill in the secrets
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Nothing is exposed to the internet directly: the frontend listens on
+# 127.0.0.1:${APP_PORT} and the host's nginx (with HTTPS) proxies to it.
+name: jacksocialclub-gestion
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-appuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-appwebhours}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-appuser} -d ${POSTGRES_DB:-appwebhours}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-appuser}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-appwebhours}
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env (openssl rand -hex 32)}
+      ALLOWED_ORIGINS: ${PUBLIC_URL:?Define PUBLIC_URL en .env}
+      ENVIRONMENT: production
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      BACKUP_DIR: /backups
+      TZ: ${TZ:-Europe/Madrid}
+    volumes:
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+
+  backup:
+    build: ./deploy/backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-appuser}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-appwebhours}
+      TZ: ${TZ:-Europe/Madrid}
+      BACKUP_CRON: ${BACKUP_CRON:-0 6 * * *}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_RCLONE_REMOTE: ${BACKUP_RCLONE_REMOTE:-}
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+    volumes:
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+      - ./deploy/backup/rclone:/config/rclone
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Same origin: nginx in the container proxies /api to the backend
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${APP_PORT:-8210}:80"
+
+volumes:
+  postgres_data:

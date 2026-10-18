@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    burn_password_check,
     decode_token,
     hash_password,
     verify_password,
@@ -40,27 +41,32 @@ class AuthService:
         self._db.add(user)
         await self._db.flush()  # get the id before commit
 
-        access_token = create_access_token(str(user.id))
-        refresh_token = create_refresh_token(str(user.id))
+        access_token = create_access_token(str(user.id), user.token_version)
+        refresh_token = create_refresh_token(str(user.id), user.token_version)
         return user, access_token, refresh_token
 
     async def login(self, email: str, password: str) -> tuple[User, str, str]:
         user = await self._db.scalar(select(User).where(User.email == email))
-        if user is None or not verify_password(password, user.hashed_password):
+        if user is None:
+            burn_password_check(password)
+            raise ValueError("Invalid email or password")
+        if not verify_password(password, user.hashed_password):
             raise ValueError("Invalid email or password")
         if not user.is_active:
             raise ValueError("Account is disabled")
 
-        access_token = create_access_token(str(user.id))
-        refresh_token = create_refresh_token(str(user.id))
+        access_token = create_access_token(str(user.id), user.token_version)
+        refresh_token = create_refresh_token(str(user.id), user.token_version)
         return user, access_token, refresh_token
 
     async def refresh(self, refresh_token: str) -> str:
-        user_id = decode_token(refresh_token, expected_type="refresh")
-        user = await self._db.get(User, uuid.UUID(user_id))
+        claims = decode_token(refresh_token, expected_type="refresh")
+        user = await self._db.get(User, uuid.UUID(claims.user_id))
         if user is None or not user.is_active:
             raise ValueError("User not found or inactive")
-        return create_access_token(str(user.id))
+        if claims.version != user.token_version:
+            raise ValueError("Session revoked")
+        return create_access_token(str(user.id), user.token_version)
 
     async def get_by_id(self, user_id: uuid.UUID) -> User:
         user = await self._db.get(User, user_id)
