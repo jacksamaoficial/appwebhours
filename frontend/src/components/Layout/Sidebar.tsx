@@ -54,7 +54,12 @@ export default function Sidebar({ open, onClose }: Props) {
         ].join(' ')}
       >
         <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200">
-          <span className="text-lg font-semibold text-indigo-600">HorasApp</span>
+          <div className="leading-tight">
+            <span className="block text-base font-semibold text-gray-900">Jack Social Club</span>
+            <span className="block text-xs font-medium uppercase tracking-widest text-gray-500">
+              Gestión
+            </span>
+          </div>
           <button onClick={onClose} className="p-1 text-gray-500 md:hidden" aria-label="Cerrar menú">
             <X className="h-5 w-5" />
           </button>
