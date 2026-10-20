@@ -32,7 +32,7 @@ function EmployeeCard({ row }: { row: EmployeePayroll }) {
             </p>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-6 text-right">
+        <div className="grid w-full grid-cols-3 gap-4 text-right sm:w-auto sm:gap-6">
           <div>
             <p className="text-xs text-gray-500">Horas normales</p>
             <p className="text-sm font-semibold text-gray-900">{formatMinutes(row.regular_minutes)}</p>

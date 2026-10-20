@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Lock, Plus, Trash2 } from 'lucide-react';
 import { useExpenses, useCreateExpense, useDeleteExpense } from '../../hooks/useExpenses';
 import { useJobs } from '../../hooks/useJobs';
 import { useClosedDays } from '../../hooks/useBusinessDays';
 import { apiErrorMessage } from '../../lib/errors';
+import { euros } from '../../lib/format';
 import type { ExpenseCategory, ExpenseCreate } from '../../types';
 
 const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
@@ -76,12 +78,12 @@ export default function ExpensesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gastos</h1>
           <p className="text-sm text-gray-500 mt-1">
             Total del mes:{' '}
-            <span className="font-semibold text-orange-600">{total.toFixed(2)} €</span>
+            <span className="font-semibold text-orange-600">{euros(total)}</span>
           </p>
         </div>
         <button
@@ -99,7 +101,7 @@ export default function ExpensesPage() {
       {showForm && (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Registrar gasto</h2>
-          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Fecha *</label>
               <input
@@ -151,7 +153,7 @@ export default function ExpensesPage() {
                 ))}
               </select>
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Descripción *</label>
               <input
                 type="text"
@@ -161,7 +163,7 @@ export default function ExpensesPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               />
             </div>
-            <div className="col-span-2 flex gap-3 lg:col-span-3">
+            <div className="sm:col-span-2 flex gap-3 lg:col-span-3">
               <button
                 type="submit"
                 disabled={createExpense.isPending}
@@ -195,17 +197,18 @@ export default function ExpensesPage() {
               const job = jobs.find((j) => j.id === expense.job_id);
               const category = CATEGORIES.find((c) => c.value === expense.category);
               return (
-                <li key={expense.id} className="flex items-center justify-between px-5 py-4">
+                <li key={expense.id} className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{expense.description}</p>
                     <p className="text-xs text-gray-500">
-                      {expense.date} · {category?.label ?? expense.category}
+                      {format(parseISO(expense.date), 'd MMM', { locale: es })} ·{' '}
+                      {category?.label ?? expense.category}
                       {job && ` · ${job.name}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-gray-900">
-                      {expense.amount.toFixed(2)} {expense.currency}
+                    <span className="whitespace-nowrap text-sm font-semibold text-gray-900">
+                      {euros(expense.amount)}
                     </span>
                     {closed.has(expense.date) ? (
                       <Lock className="h-4 w-4 text-gray-300" aria-label="Día cerrado" />

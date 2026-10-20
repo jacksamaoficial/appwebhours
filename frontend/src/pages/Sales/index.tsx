@@ -6,13 +6,10 @@ import { useBusinessDays, useCloseDay, useSetDailySales } from '../../hooks/useB
 import { useAuthStore } from '../../store/authStore';
 import { hasRole } from '../../lib/permissions';
 import { apiErrorMessage } from '../../lib/errors';
+import { euros } from '../../lib/format';
 import type { BusinessDay, DailySalesUpdate } from '../../types';
 
 const emptySales: DailySalesUpdate = { cash: 0, card: 0, cash_out: 0, notes: '' };
-
-function euros(value: number): string {
-  return `${value.toFixed(2)} €`;
-}
 
 function emptyDay(date: string): BusinessDay {
   return {
@@ -71,6 +68,8 @@ export default function SalesPage() {
   const startEditing = (day: BusinessDay) => {
     setError('');
     setEditing(day.date);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
     setForm({ cash: day.cash, card: day.card, cash_out: day.cash_out, notes: day.notes ?? '' });
   };
 
@@ -143,7 +142,7 @@ export default function SalesPage() {
             Ventas del{' '}
             {format(parse(editing, 'yyyy-MM-dd', new Date()), "EEEE d 'de' MMMM", { locale: es })}
           </h2>
-          <form onSubmit={(e) => void handleSave(e)} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <form onSubmit={(e) => void handleSave(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-4">
             {(
               [
                 ['cash', 'Efectivo'],
@@ -169,7 +168,7 @@ export default function SalesPage() {
               <p className="block text-sm font-medium text-gray-700 mb-1">Total neto</p>
               <p className="py-2 text-lg font-semibold text-gray-900">{euros(formTotal)}</p>
             </div>
-            <div className="col-span-2 lg:col-span-4">
+            <div className="sm:col-span-2 lg:col-span-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
               <input
                 type="text"
@@ -179,7 +178,7 @@ export default function SalesPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               />
             </div>
-            <div className="col-span-2 flex gap-3 lg:col-span-4">
+            <div className="sm:col-span-2 flex gap-3 lg:col-span-4">
               <button
                 type="submit"
                 disabled={setSales.isPending}
@@ -199,7 +198,57 @@ export default function SalesPage() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      {/* Phones: one card per day */}
+      <ul className="space-y-3 md:hidden">
+        {days.map((day) => (
+          <li key={day.date} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium text-gray-900">
+                  {format(parse(day.date, 'yyyy-MM-dd', new Date()), "EEEE d", { locale: es })}
+                </p>
+                {day.is_closed ? (
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                    <Lock className="h-3 w-3" /> Cerrado
+                  </span>
+                ) : (
+                  <span className="mt-1 inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                    Abierto
+                  </span>
+                )}
+              </div>
+              <p className="text-lg font-bold tabular-nums text-gray-900">{euros(day.total)}</p>
+            </div>
+            <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <div><dt className="text-gray-500">Efectivo</dt><dd className="tabular-nums text-gray-800">{euros(day.cash)}</dd></div>
+              <div><dt className="text-gray-500">Tarjetas</dt><dd className="tabular-nums text-gray-800">{euros(day.card)}</dd></div>
+              <div><dt className="text-gray-500">Salidas</dt><dd className="tabular-nums text-gray-800">{euros(day.cash_out)}</dd></div>
+            </dl>
+            {day.notes && <p className="mt-2 text-xs text-gray-400">{day.notes}</p>}
+            <div className="mt-3 flex gap-2">
+              {!day.is_closed && (
+                <button
+                  onClick={() => startEditing(day)}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700"
+                >
+                  <Pencil className="h-4 w-4" /> Editar
+                </button>
+              )}
+              {isOwner && (
+                <button
+                  onClick={() => void toggleClosed(day)}
+                  disabled={closeDay.isPending}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+                >
+                  {day.is_closed ? <><LockOpen className="h-4 w-4" /> Reabrir</> : <><Lock className="h-4 w-4" /> Cerrar día</>}
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className={`overflow-x-auto rounded-xl border border-gray-200 bg-white ${days.length ? 'hidden md:block' : ''}`}>
         {isLoading ? (
           <div className="flex items-center justify-center p-10">
             <div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />

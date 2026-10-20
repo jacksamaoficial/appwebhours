@@ -173,7 +173,58 @@ export default function BackupsPage() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      {/* Phones: one card per backup */}
+      <ul className="space-y-3 md:hidden">
+        {backups.map((b) => (
+          <li key={b.name} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-medium text-gray-900">
+                {format(parseISO(b.created_at), "EEE d MMM yyyy, HH:mm", { locale: es })}
+              </p>
+              <span className="shrink-0 text-xs text-gray-500">{fileSize(b.size_bytes)}</span>
+            </div>
+            <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs ${KIND_LABELS[b.kind].className}`}>
+              {KIND_LABELS[b.kind].label}
+            </span>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => {
+                  start();
+                  downloadBackup(b.name).catch(onError('No se pudo descargar la copia.'));
+                }}
+                className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700"
+              >
+                <Download className="h-4 w-4" /> Descargar
+              </button>
+              <button
+                onClick={() => {
+                  start();
+                  setConfirmText('');
+                  setRestoring(b);
+                  document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700"
+              >
+                <RotateCcw className="h-4 w-4" /> Restaurar
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar la copia ${b.name}?`)) {
+                    start();
+                    remove.mutate(b.name);
+                  }
+                }}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-gray-500"
+                aria-label="Eliminar copia"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className={`overflow-x-auto rounded-xl border border-gray-200 bg-white ${backups.length ? 'hidden md:block' : ''}`}>
         {isLoading ? (
           <div className="flex items-center justify-center p-10">
             <div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />

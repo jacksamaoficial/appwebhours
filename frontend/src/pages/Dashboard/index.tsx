@@ -8,6 +8,7 @@ import { useEmployees } from '../../hooks/useBusiness';
 import { useBusinessDays } from '../../hooks/useBusinessDays';
 import { useAuthStore } from '../../store/authStore';
 import { hasRole } from '../../lib/permissions';
+import { euros } from '../../lib/format';
 
 function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -60,13 +61,13 @@ export default function DashboardPage() {
     },
     canExpenses && {
       label: 'Gastos del mes',
-      value: `${monthExpenseTotal.toFixed(2)} €`,
+      value: euros(monthExpenseTotal),
       icon: Receipt,
       color: 'text-orange-600 bg-orange-50',
     },
     canSales && {
       label: 'Ventas netas del mes',
-      value: `${monthSalesTotal.toFixed(2)} €`,
+      value: euros(monthSalesTotal),
       icon: Wallet,
       color: 'text-sky-600 bg-sky-50',
     },

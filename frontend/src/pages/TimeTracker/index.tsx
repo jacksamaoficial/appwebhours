@@ -140,7 +140,7 @@ export default function TimeTrackerPage() {
       {showForm && !isClosed && (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Registrar horas</h2>
-          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-3">
             {isOwner && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Empleado</label>
@@ -198,7 +198,7 @@ export default function TimeTrackerPage() {
                 <p className="mt-1 text-xs text-gray-500">Termina al día siguiente (después de medianoche).</p>
               )}
             </div>
-            <div className="col-span-2 lg:col-span-3">
+            <div className="sm:col-span-2 lg:col-span-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
               <input
                 type="text"
@@ -208,7 +208,7 @@ export default function TimeTrackerPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               />
             </div>
-            <div className="col-span-2 flex gap-3 lg:col-span-3">
+            <div className="sm:col-span-2 flex gap-3 lg:col-span-3">
               <button
                 type="submit"
                 disabled={createEntry.isPending}

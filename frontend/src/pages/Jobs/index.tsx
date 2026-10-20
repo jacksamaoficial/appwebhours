@@ -32,7 +32,7 @@ export default function JobsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Puestos</h1>
         <button
           onClick={() => setShowForm(true)}
@@ -46,7 +46,7 @@ export default function JobsPage() {
       {showForm && (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Nuevo puesto</h2>
-          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
               <input
@@ -82,7 +82,7 @@ export default function JobsPage() {
                 className="h-10 w-full rounded-lg border border-gray-300 px-1 py-1 cursor-pointer"
               />
             </div>
-            <div className="col-span-2 lg:col-span-3">
+            <div className="sm:col-span-2 lg:col-span-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
               <input
                 type="text"
@@ -91,7 +91,7 @@ export default function JobsPage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
               />
             </div>
-            <div className="col-span-2 flex gap-3 lg:col-span-3">
+            <div className="sm:col-span-2 flex gap-3 lg:col-span-3">
               <button
                 type="submit"
                 disabled={createJob.isPending}

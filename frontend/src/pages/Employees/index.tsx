@@ -64,7 +64,7 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Empleados</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -85,7 +85,7 @@ export default function EmployeesPage() {
       {showForm && (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Nuevo empleado</h2>
-          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-2 gap-4">
+          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
               <input
@@ -136,7 +136,7 @@ export default function EmployeesPage() {
               </select>
               <p className="mt-1 text-xs text-gray-500">{ROLE_HINTS[form.role]}</p>
             </div>
-            <div className="col-span-2 rounded-lg bg-gray-50 p-4">
+            <div className="sm:col-span-2 rounded-lg bg-gray-50 p-4">
               <p className="mb-2 text-sm font-medium text-gray-900">Horario y tarifas</p>
               <PayBandsFields
                 bands={bands}
@@ -145,7 +145,7 @@ export default function EmployeesPage() {
                 onOvertimeRateChange={setOvertimeRate}
               />
             </div>
-            <div className="col-span-2 flex gap-3">
+            <div className="sm:col-span-2 flex gap-3">
               <button
                 type="submit"
                 disabled={createEmployee.isPending}
@@ -202,7 +202,7 @@ export default function EmployeesPage() {
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => setScheduleFor(scheduleFor === employee.id ? null : employee.id)}
                           className="flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
